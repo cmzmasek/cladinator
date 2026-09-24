@@ -1007,12 +1007,20 @@ public class CladeAnalysisTest {
             if (!res3.getWarnings().isEmpty()) {
                 return false;
             }
-            final String zero = "((((A.1.1,A.1.2),Q_#1_M=0),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.0),B.2.1))";
-            try {
-                AnalysisMulti.execute(factory.create(zero, new NHXParser())[0], ".");
-                return false;
-            } catch (final UserException expected) {
-                // ok
+            for (final String bad : new String[]{
+                    "((((A.1.1,A.1.2),Q_#1_M=0),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.0),B.2.1))",
+                    "((((A.1.1,A.1.2),Q_#1_M=NaN),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.5),B.2.1))",
+                    "((((A.1.1,A.1.2),Q_#1_M=Infinity),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.5),B.2.1))",
+                    "((((A.1.1,A.1.2),Q_#1_M=-0.5),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=1.5),B.2.1))",
+                    "((((A.1.1,A.1.2),Q_#1_M=abc),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.5),B.2.1))"}) {
+                try {
+                    AnalysisMulti.execute(factory.create(bad, new NHXParser())[0], ".");
+                    return false;
+                } catch (final UserException expected) {
+                    if (expected.getMessage().startsWith("ERROR")) {
+                        return false;
+                    }
+                }
             }
         } catch (final Exception e) {
             e.printStackTrace(System.out);

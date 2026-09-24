@@ -1,0 +1,7 @@
+# input trees: test/data/t19_all_errors.nwk
+# annotation separator: .
+# query pattern: _#\d+_M=(.+)
+# confidence cutoff: 0.7
+# non-homologous query factor: 2.0
+#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Placement count	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
+1	QA				Input error: query nodes with different label prefixes found: "QA" and "QB"	2				

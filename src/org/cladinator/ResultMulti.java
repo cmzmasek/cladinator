@@ -21,8 +21,8 @@
 
 package org.cladinator;
 
-import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
@@ -31,7 +31,6 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 
 import org.forester.util.ForesterUtil;
-import org.forester.util.UserException;
 
 public final class ResultMulti {
 
@@ -50,7 +49,6 @@ public final class ResultMulti {
     private int _ref_tree_ext_nodes = 0;
     private String _query_name_prefix = "";
     private final List<String> _warnings = new ArrayList<String>();
-    private final static DecimalFormat df = new DecimalFormat("0.0###");
 
     ResultMulti(final String separator) {
         if (ForesterUtil.isEmpty(separator)) {
@@ -104,7 +102,7 @@ public final class ResultMulti {
 
     /** Problems with the input that did not prevent the analysis (e.g. rescaled confidences); empty if none. */
     public List<String> getWarnings() {
-        return _warnings;
+        return Collections.unmodifiableList(_warnings);
     }
 
     void addWarning(final String warning) {
@@ -186,7 +184,7 @@ public final class ResultMulti {
         _ref_tree_ext_nodes = ext_nodes;
     }
 
-    void analyze() throws UserException {
+    void analyze() {
         reset();
         analyzeGreatestCommonPrefixes(_greatest_common_prefixes, _separator);
         analyzeGreatestCommonPrefixesUp(_greatest_common_prefixes_up, _separator);
@@ -203,8 +201,7 @@ public final class ResultMulti {
     }
 
     private void analyzeGreatestCommonPrefixes(final List<Prefix> greatest_common_prefixes,
-                                               final String separator)
-            throws UserException {
+                                               final String separator) {
         final List<Prefix> l = obtainAllPrefixes(greatest_common_prefixes, separator);
         if (!ForesterUtil.isEmpty(l)) {
             sortPrefixesAccordingToConfidence(l);
@@ -215,8 +212,7 @@ public final class ResultMulti {
     }
 
     private void analyzeGreatestCommonPrefixesUp(final List<Prefix> greatest_common_prefixes_up,
-                                                 final String separator)
-            throws UserException {
+                                                 final String separator) {
         final List<Prefix> l = obtainAllPrefixes(greatest_common_prefixes_up, separator);
         if (!ForesterUtil.isEmpty(l)) {
             sortPrefixesAccordingToConfidence(l);
@@ -227,8 +223,7 @@ public final class ResultMulti {
     }
 
     void analyzeGreatestCommonPrefixesDown(final List<Prefix> greatest_common_prefixes_down,
-                                           final String separator)
-            throws UserException {
+                                           final String separator) {
         final List<Prefix> l = obtainAllPrefixes(greatest_common_prefixes_down, separator);
         if (!ForesterUtil.isEmpty(l)) {
             sortPrefixesAccordingToConfidence(l);
@@ -239,7 +234,7 @@ public final class ResultMulti {
     }
 
 
-    private static List<Prefix> collapse(final List<Prefix> cleaned) throws UserException {
+    private static List<Prefix> collapse(final List<Prefix> cleaned) {
         final List<Prefix> collapsed = new ArrayList<Prefix>();
         final Set<String> firsts = new HashSet<String>();
         double confidence_sum = 0;

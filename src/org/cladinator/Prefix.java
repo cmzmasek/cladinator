@@ -23,11 +23,15 @@ package org.cladinator;
 
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 public final class Prefix {
 
-    private final static DecimalFormat df = new DecimalFormat( "0.0###" );
+    /** How confidences are printed everywhere: up to 4 decimals, always with a "." (independent of the locale). */
+    public final static DecimalFormat CONFIDENCE_FORMAT = new DecimalFormat( "0.0###",
+                                                                             DecimalFormatSymbols.getInstance( Locale.ROOT ) );
     private final String               _prefix;
     private final BigDecimal           _confidence;
     private final String               _separator;
@@ -75,10 +79,10 @@ public final class Prefix {
 
     @Override
     public String toString() {
-        return getPrefix() + ": " + df.format( getConfidence() );
+        return getPrefix() + ": " + CONFIDENCE_FORMAT.format( getConfidence() );
     }
     
     public String toStringRemoveSeparator() {
-        return getPrefixRemoveSeparator() + ": " + df.format( getConfidence() );
+        return getPrefixRemoveSeparator() + ": " + CONFIDENCE_FORMAT.format( getConfidence() );
     }
 }

@@ -22,7 +22,6 @@
 package org.cladinator;
 
 import java.io.*;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.SortedMap;
@@ -72,7 +71,11 @@ public final class cladinator {
     final static private Pattern QUERY_PATTERN_DEFAULT = AnalysisMulti.DEFAULT_QUERY_PATTERN_FOR_PPLACER_TYPE;
     final static private String EXTRA_PROCESSING1_SEP_DEFAULT = "|";
     final static private boolean EXTRA_PROCESSING1_KEEP_EXTRA_DEFAULT = false;
-    private final static DecimalFormat df = new DecimalFormat("0.0###");
+    /** Confidences at or above cutoff - this tolerance pass, so that -c=1 is reachable despite rounding. */
+    final static private double CUTOFF_TOLERANCE = 1E-9;
+    /** The columns of the output table, in order. */
+    final static private String[] COLUMNS = {"Tree #", "Query", "Assignment", "Confidence", "Brackets", "Conclusion",
+            "Placement count", "Clade confidences", "Down-tree confidences", "Up-tree confidences", "Warnings"};
     final static private String NON_HOMOLOGOUS_QUERY_MESSAGE = "Input sequence error: Likely non-homologous query sequence";
 
 
@@ -228,7 +231,7 @@ public final class cladinator {
                     ForesterUtil.fatalError(PRG_NAME, "no value for confidence cutoff");
                 }
                 cutoff = cla.getOptionValueAsDouble(CUTOFF_OPTION);
-                if ((cutoff <= 0) || (cutoff > 1)) {
+                if (Double.isNaN(cutoff) || (cutoff <= 0) || (cutoff > 1)) {
                     ForesterUtil.fatalError(PRG_NAME, "confidence cutoff must be greater than 0 and at most 1");
                 }
             }
@@ -238,8 +241,8 @@ public final class cladinator {
                     ForesterUtil.fatalError(PRG_NAME, "no value for non-homologous query factor");
                 }
                 nh_factor = cla.getOptionValueAsDouble(NON_HOMOLOGOUS_FACTOR_OPTION);
-                if (nh_factor < 0) {
-                    ForesterUtil.fatalError(PRG_NAME, "non-homologous query factor must not be negative (0 turns the check off)");
+                if (Double.isNaN(nh_factor) || Double.isInfinite(nh_factor) || (nh_factor < 0)) {
+                    ForesterUtil.fatalError(PRG_NAME, "non-homologous query factor must be a non-negative number (0 turns the check off)");
                 }
             }
 
@@ -294,66 +297,74 @@ public final class cladinator {
             if (phys.length == 1) {
                 System.out.println("Ext. nodes in input tree   : " + phys[0].getNumberOfExternalNodes());
             }
-            final EasyWriter outtable_writer;
-            if (outtablefile != null) {
-                outtable_writer = ForesterUtil.createEasyWriter(outtablefile);
-
-            } else {
-                outtable_writer = null;
+            final List<BufferedWriter> writers = new ArrayList<>();
+            final EasyWriter outtable_writer = (outtablefile != null) ? ForesterUtil.createEasyWriter(outtablefile) : null;
+            if (outtable_writer != null) {
+                writers.add(outtable_writer);
             }
-            final BufferedWriter print_writer = new BufferedWriter(new PrintWriter(System.out));
-            int counter = 0;
+            // not closed at the end: closing it would close System.out
+            writers.add(new BufferedWriter(new PrintWriter(System.out)));
             System.out.println();
             System.out.println("Results:");
             System.out.println();
-            final List<String> header = new ArrayList<>();
-            header.add("# " + PRG_NAME + " " + PRG_VERSION + " (" + PRG_DATE + ")");
-            header.add("# input trees: " + intreefile);
+            final StringBuilder header = new StringBuilder();
+            header.append("# " + PRG_NAME + " " + PRG_VERSION + " (" + PRG_DATE + ")\n");
+            header.append("# input trees: " + intreefile + "\n");
             if (mapping_file != null) {
-                header.add("# mapping file: " + mapping_file);
+                header.append("# mapping file: " + mapping_file + "\n");
             }
-            header.add("# annotation separator: " + separator);
-            header.add("# query pattern: " + pattern);
-            header.add("# confidence cutoff: " + cutoff);
-            header.add("# non-homologous query factor: " + (nh_factor > 0 ? String.valueOf(nh_factor) : "off"));
+            header.append("# annotation separator: " + separator + "\n");
+            header.append("# query pattern: " + pattern + "\n");
+            header.append("# confidence cutoff: " + cutoff + "\n");
+            header.append("# non-homologous query factor: " + (nh_factor > 0 ? String.valueOf(nh_factor) : "off") + "\n");
             if (extra_processing1) {
-                header.add("# extra processing: separator \"" + extra_processing1_sep + "\", keep extra: " + extra_processing1_keep);
+                header.append("# extra processing: separator \"" + extra_processing1_sep + "\", keep extra: " + extra_processing1_keep + "\n");
             }
             if (special_processing) {
-                header.add("# special processing pattern: " + special_pattern);
+                header.append("# special processing pattern: " + special_pattern + "\n");
             }
             if (remove_annotation_sep) {
-                header.add("# annotation separator removed from clade names in this table");
+                header.append("# annotation separator removed from clade names in this table\n");
             }
             if (split_query) {
-                header.add("# query names split at \"" + QUERY_NAME_SPLIT_SEP + "\"");
+                header.append("# query names split at \"" + QUERY_NAME_SPLIT_SEP + "\"\n");
             }
-            if (outtable_writer != null) {
-                writeHeader(header, outtable_writer);
-            }
-            writeHeader(header, print_writer);
+            header.append("#" + String.join("\t", COLUMNS) + "\n");
+            emit(writers, header.toString());
+            int counter = 0;
+            int input_errors = 0;
+            int non_homologous = 0;
             for (final Phylogeny phy : phys) {
                 ++counter;
+                String rows;
                 try {
-                    analyzeTree(phy, counter, settings, outtable_writer, print_writer);
-                } catch (final UserException e) {
-                    // A problem with this tree only: report it in its row and go on with the next tree.
-                    final String message = "Input error: " + e.getMessage();
-                    final String q = queryNamePrefix(phy, pattern);
-                    final int placements = numberOfQueryNodes(phy, pattern);
-                    if (outtable_writer != null) {
-                        inputErrorRows(counter, q, settings.split_query, message, placements, outtable_writer);
+                    rows = analyzeTree(phy, counter, settings);
+                } catch (final TreeProblem e) {
+                    // A problem with this tree only: report it in its row(s) and go on with the next tree.
+                    if (e.input_error) {
+                        ++input_errors;
+                    } else {
+                        ++non_homologous;
                     }
-                    inputErrorRows(counter, q, settings.split_query, message, placements, print_writer);
+                    rows = "";
+                    for (final String query : queryNames(e.query_name, split_query)) {
+                        rows += errorRow(counter, query, e.getMessage(), e.placements);
+                    }
                 }
-                print_writer.flush();
+                emit(writers, rows);
+            }
+            for (final BufferedWriter w : writers) {
+                w.flush();
             }
             if (outtable_writer != null) {
-                outtable_writer.flush();
                 outtable_writer.close();
             }
-            print_writer.flush();
-            print_writer.close();
+            System.out.println();
+            System.out.println("Trees: " + counter + ", with result: " + (counter - input_errors - non_homologous)
+                    + ", likely non-homologous query: " + non_homologous + ", input errors: " + input_errors);
+            if ((counter > 0) && (input_errors == counter)) {
+                ForesterUtil.fatalError(PRG_NAME, "no tree could be analyzed (" + input_errors + " input error(s), see the table)");
+            }
         } catch (final IOException e) {
             ForesterUtil.fatalError(PRG_NAME, e.getMessage());
         } catch (final Exception e) {
@@ -363,91 +374,76 @@ public final class cladinator {
     }
 
     /** The settings of a run that the per-tree analysis and the output need. */
-    private static final class Settings {
-        final Pattern pattern;
-        final String separator;
-        final SortedMap<String, String> map;
-        final boolean extra_processing1;
-        final String extra_processing1_sep;
-        final boolean extra_processing1_keep;
-        final boolean special_processing;
-        final Pattern special_pattern;
-        /** How clade names are printed (identity, or with -rs without the separator). */
-        final UnaryOperator<String> label;
-        final boolean split_query;
-        /** Minimum summed placement confidence for a clade to be assigned. */
-        final double cutoff;
-        /** Factor for the non-homologous query check; 0 turns the check off. */
-        final double nh_factor;
+    private record Settings(Pattern pattern,
+                            String separator,
+                            SortedMap<String, String> map,
+                            boolean extra_processing1,
+                            String extra_processing1_sep,
+                            boolean extra_processing1_keep,
+                            boolean special_processing,
+                            Pattern special_pattern,
+                            /** How clade names are printed (identity, or with -rs without the separator). */
+                            UnaryOperator<String> label,
+                            boolean split_query,
+                            /** Minimum summed placement confidence for a clade to be assigned. */
+                            double cutoff,
+                            /** Factor for the non-homologous query check; 0 turns the check off. */
+                            double nh_factor) {
+    }
 
-        Settings(final Pattern pattern, final String separator, final SortedMap<String, String> map,
-                 final boolean extra_processing1, final String extra_processing1_sep, final boolean extra_processing1_keep,
-                 final boolean special_processing, final Pattern special_pattern, final UnaryOperator<String> label,
-                 final boolean split_query, final double cutoff, final double nh_factor) {
-            this.pattern = pattern;
-            this.separator = separator;
-            this.map = map;
-            this.extra_processing1 = extra_processing1;
-            this.extra_processing1_sep = extra_processing1_sep;
-            this.extra_processing1_keep = extra_processing1_keep;
-            this.special_processing = special_processing;
-            this.special_pattern = special_pattern;
-            this.label = label;
-            this.split_query = split_query;
-            this.cutoff = cutoff;
-            this.nh_factor = nh_factor;
+    /** A tree that gets an error row instead of a result: an input error, or a likely non-homologous query. */
+    private static final class TreeProblem extends Exception {
+        final String query_name;
+        final int placements;
+        final boolean input_error;
+
+        TreeProblem(final String message, final String query_name, final int placements, final boolean input_error) {
+            super(message);
+            this.query_name = query_name;
+            this.placements = placements;
+            this.input_error = input_error;
         }
     }
 
-    private static void analyzeTree(final Phylogeny phy,
-                                    final int counter,
-                                    final Settings st,
-                                    final EasyWriter outtable_writer,
-                                    final BufferedWriter print_writer) throws UserException, IOException {
-        final Pattern pattern = st.pattern;
-        final String separator = st.separator;
-        final SortedMap<String, String> map = st.map;
-        final boolean extra_processing1 = st.extra_processing1;
-        final String extra_processing1_sep = st.extra_processing1_sep;
-        final boolean extra_processing1_keep = st.extra_processing1_keep;
-        final boolean special_processing = st.special_processing;
-        final Pattern special_pattern = st.special_pattern;
-        final UnaryOperator<String> label = st.label;
-        final boolean split_query = st.split_query;
-        if (map != null) {
-            AnalysisMulti.performMapping(pattern, map, phy, true);
+    private static void emit(final List<BufferedWriter> writers, final String text) throws IOException {
+        for (final BufferedWriter w : writers) {
+            w.write(text);
+            w.flush(); // keeps the console in order with what the analysis prints directly
         }
-        if (extra_processing1) {
-            AnalysisMulti.performExtraProcessing1(pattern, phy, extra_processing1_sep, extra_processing1_keep, separator, true);
-        } else if (special_processing) {
-            AnalysisMulti.performSpecialProcessing1(pattern, phy, separator, special_pattern, true);
-        }
+    }
 
+    /** Analyzes one tree and returns its row(s) of the table. */
+    private static String analyzeTree(final Phylogeny phy, final int counter, final Settings st) throws TreeProblem {
+        final Pattern pattern = st.pattern();
         final List<PhylogenyNode> query_nodes = phy.getNodes(pattern); // null for an empty tree
         if ((query_nodes == null) || query_nodes.isEmpty()) {
-            final String message = "Input error: no query found (query pattern: " + pattern + ")";
-            if (outtable_writer != null) {
-                inputErrorRows(counter, "", split_query, message, 0, outtable_writer);
+            throw new TreeProblem("Input error: no query found (query pattern: " + pattern + ")", "", 0, true);
+        }
+        final String query_name = queryNamePrefix(query_nodes.get(0), pattern);
+        try {
+            if (st.map() != null) {
+                AnalysisMulti.performMapping(pattern, st.map(), phy, true);
             }
-            inputErrorRows(counter, "", split_query, message, 0, print_writer);
-            return;
-        }
-
-        if ((st.nh_factor > 0) && AnalysisMulti.likelyProblematicQuery(phy, pattern, st.nh_factor)) {
-            final String q = queryNamePrefix(phy, pattern);
-            if (outtable_writer != null) {
-                inputErrorRows(counter, q, split_query, NON_HOMOLOGOUS_QUERY_MESSAGE, query_nodes.size(), outtable_writer);
+            if (st.extra_processing1()) {
+                AnalysisMulti.performExtraProcessing1(pattern, phy, st.extra_processing1_sep(), st.extra_processing1_keep(), st.separator(), true);
+            } else if (st.special_processing()) {
+                AnalysisMulti.performSpecialProcessing1(pattern, phy, st.separator(), st.special_pattern(), true);
             }
-            inputErrorRows(counter, q, split_query, NON_HOMOLOGOUS_QUERY_MESSAGE, query_nodes.size(), print_writer);
-            return;
+            if ((st.nh_factor() > 0) && AnalysisMulti.likelyProblematicQuery(phy, pattern, st.nh_factor())) {
+                throw new TreeProblem(NON_HOMOLOGOUS_QUERY_MESSAGE, query_name, query_nodes.size(), false);
+            }
+            final ResultMulti res = AnalysisMulti.execute(phy, pattern, st.separator());
+            return resultRows(res, counter, st);
+        } catch (final UserException e) {
+            throw new TreeProblem("Input error: " + e.getMessage(), query_name, query_nodes.size(), true);
         }
+    }
 
-        final ResultMulti res = AnalysisMulti.execute(phy, pattern, separator);
-
-        if (outtable_writer != null) {
-            printResult(res, counter, pattern, label, split_query, st.cutoff, outtable_writer);
-        }
-        printResult(res, counter, pattern, label, split_query, st.cutoff, print_writer);
+    /** The query name: the part of a query node's name before the query pattern. */
+    private static String queryNamePrefix(final PhylogenyNode query_node, final Pattern pattern) {
+        final String name = query_node.getName();
+        final Matcher m = pattern.matcher(name);
+        return m.find() ? name.substring(0, m.start()) : name;
     }
 
     /** The names to print for a query: the name itself, or with -sq its "_"-separated parts, one row each. */
@@ -455,134 +451,51 @@ public final class cladinator {
         return split_query ? query_name.split(QUERY_NAME_SPLIT_SEP) : new String[]{query_name};
     }
 
-    private static void inputErrorRows(final int counter, final String query_name, final boolean split_query, final String message, final int placements, final BufferedWriter w) throws IOException {
-        for (final String query : queryNames(query_name, split_query)) {
-            inputErrorRow(counter, query, message, placements, w);
+    /**
+     * The row(s) for a result. The assignment is the first clade at or above the cutoff, looking first at the
+     * clades themselves, then at the down-tree brackets, then at the up-tree brackets; if there is none, the
+     * best-matching clade is reported without a confident assignment.
+     */
+    private static String resultRows(final ResultMulti res, final int counter, final Settings st) {
+        if (res.getAllMultiHitPrefixes().isEmpty()) {
+            throw new IllegalStateException("no prefixes for query \"" + res.getQueryNamePrefix() + "\" in tree #" + counter);
         }
-    }
-
-    /** The query name, i.e. the part of the first query node's name before the query pattern; "" if none. */
-    private static String queryNamePrefix(final Phylogeny phy, final Pattern pattern) {
-        final List<PhylogenyNode> nodes = phy.getNodes(pattern);
-        if ((nodes == null) || nodes.isEmpty()) {
-            return "";
-        }
-        final String name = nodes.get(0).getName();
-        final Matcher m = pattern.matcher(name);
-        return m.find() ? name.substring(0, m.start()) : name;
-    }
-
-    private static int numberOfQueryNodes(final Phylogeny phy, final Pattern pattern) {
-        final List<PhylogenyNode> nodes = phy.getNodes(pattern);
-        return (nodes == null) ? 0 : nodes.size();
-    }
-
-    private static void inputErrorRow(final int counter, final String query, final String message, final int placements, final BufferedWriter w) throws IOException {
-        w.write(String.valueOf(counter));
-        w.write("\t");
-        w.write(query);
-        w.write("\t");
-        w.write("");
-        w.write("\t");
-        w.write("");
-        w.write("\t");
-        w.write("");
-        w.write("\t");
-        w.write(message);
-        w.write("\t");
-        w.write(String.valueOf(placements));
-        w.write("\t\t\t\t");
-        w.write("\n");
-        w.flush();
-    }
-
-    private final static void printResult(final ResultMulti res, final int counter, final Pattern pattern, final UnaryOperator<String> label, final boolean split_query, final double cutoff, final BufferedWriter w) throws IOException {
-        if ((res.getAllMultiHitPrefixes() == null) || (res.getAllMultiHitPrefixes().size() < 1)) {
-            w.flush();
-            ForesterUtil.fatalError(PRG_NAME, "ERROR: No match to query pattern \"" + pattern + "\" in tree #" + counter);
-        }
-        boolean done = false;
-
-        //System.out.println("UP:");
-        //System.out.println( res.getAllMultiHitPrefixesUp() );
-        //System.out.println("DOWN:");
-        //System.out.println( res.getAllMultiHitPrefixesDown() );
-        //System.out.println("CONS:");
-        // System.out.println( res.getAllMultiHitPrefixes() );
-        for (final Prefix prefix : res.getCollapsedMultiHitPrefixes()) {
-            if ((prefix.getConfidence() >= cutoff) && !prefix.getPrefix().equals(AnalysisMulti.UNKNOWN)) {
-                if (split_query) {
-                    final String[] queries = queryNames(res.getQueryNamePrefix(), split_query);
-                    for (final String query : queries) {
-                        printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res, w);
-                    }
-                } else {
-                    printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res, w);
+        final String down = res.getAllMultiHitPrefixesDown().get(0).getPrefix();
+        final String up = res.getAllMultiHitPrefixesUp().get(0).getPrefix();
+        Prefix chosen = null;
+        for (final List<Prefix> candidates : List.of(res.getCollapsedMultiHitPrefixes(),
+                res.getCollapsedMultiHitPrefixesDown(),
+                res.getCollapsedMultiHitPrefixesUp())) {
+            for (final Prefix prefix : candidates) {
+                if ((prefix.getConfidence() >= st.cutoff() - CUTOFF_TOLERANCE) && !prefix.getPrefix().equals(AnalysisMulti.UNKNOWN)) {
+                    chosen = prefix;
+                    break;
                 }
-                done = true;
+            }
+            if (chosen != null) {
                 break;
             }
         }
-        if (!done) {
-            if (!ForesterUtil.isEmpty(res.getAllMultiHitPrefixesDown())) {
-                for (final Prefix prefix : res.getCollapsedMultiHitPrefixesDown()) {
-                    if ((prefix.getConfidence() >= cutoff) && !prefix.getPrefix().equals(AnalysisMulti.UNKNOWN)) {
-                        if (split_query) {
-                            final String[] queries = queryNames(res.getQueryNamePrefix(), split_query);
-                            for (final String query : queries) {
-                                printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res, w);
-                            }
-                        } else {
-                            printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res, w);
-                        }
-                        done = true;
-                        break;
-                    }
-                }
-            }
-        }
-        if (!done) {
-            if (!ForesterUtil.isEmpty(res.getAllMultiHitPrefixesUp())) {
-                for (final Prefix prefix : res.getCollapsedMultiHitPrefixesUp()) {
-                    if ((prefix.getConfidence() >= cutoff) && !prefix.getPrefix().equals(AnalysisMulti.UNKNOWN)) {
-                        if (split_query) {
-                            final String[] queries = queryNames(res.getQueryNamePrefix(), split_query);
-                            for (final String query : queries) {
-                                printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res, w);
-                            }
-                        } else {
-                            printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res, w);
-                        }
-                        done = true;
-                        break;
-                    }
-                }
-            }
-        }
-        if (!done) {
-            if (split_query) {
-                final String[] queries = queryNames(res.getQueryNamePrefix(), split_query);
-                for (final String query : queries) {
-
-                    final Prefix r = res.getAllMultiHitPrefixes().get(0);
-
-                    printRow(counter, query, r.getPrefix(), r.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, res.getNumberOfMatches(), false, label, res, w);
-                }
+        final StringBuilder rows = new StringBuilder();
+        for (final String query : queryNames(res.getQueryNamePrefix(), st.split_query())) {
+            if (chosen != null) {
+                rows.append(row(counter, query, chosen.getPrefix(), chosen.getConfidence(), down, up, true, st.label(), res));
             } else {
-                final Prefix r = res.getAllMultiHitPrefixes().get(0);
-                printRow(counter, res.getQueryNamePrefix(), r.getPrefix(), r.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, res.getNumberOfMatches(), false, label, res, w);
+                final Prefix best = res.getAllMultiHitPrefixes().get(0);
+                rows.append(row(counter, query, best.getPrefix(), best.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, false, st.label(), res));
             }
         }
-        w.flush();
+        return rows.toString();
     }
 
-    private static void writeHeader(final List<String> parameter_lines, final BufferedWriter w) throws IOException {
-        for (final String line : parameter_lines) {
-            w.write(line);
-            w.write("\n");
-        }
-        w.write("#Tree #\tQuery\tAssignment\tConfidence\tBrackets\tConclusion\tPlacement count\tClade confidences\tDown-tree confidences\tUp-tree confidences\tWarnings");
-        w.write("\n");
+    private static String errorRow(final int counter, final String query, final String message, final int placements) {
+        final String[] cells = new String[COLUMNS.length];
+        java.util.Arrays.fill(cells, "");
+        cells[0] = String.valueOf(counter);
+        cells[1] = query;
+        cells[5] = message;
+        cells[6] = String.valueOf(placements);
+        return String.join("\t", cells) + "\n";
     }
 
     /** All prefixes of a list with their confidences, e.g. "A:1.0;A.1:0.9;A.2:0.1". */
@@ -592,74 +505,56 @@ public final class cladinator {
             if (sb.length() > 0) {
                 sb.append(";");
             }
-            sb.append(label.apply(p.getPrefix())).append(":").append(df.format(p.getConfidence()));
+            sb.append(label.apply(p.getPrefix())).append(":").append(Prefix.CONFIDENCE_FORMAT.format(p.getConfidence()));
         }
         return sb.toString();
     }
 
-    private static void printRow(final int counter, final String query, final String match, final double confidence, final String prefix_down, final String prefix_up, final int placements, final boolean confident, final UnaryOperator<String> label, final ResultMulti res, final BufferedWriter w) throws IOException {
+    private static String row(final int counter, final String query, final String match, final double confidence, final String prefix_down, final String prefix_up, final boolean confident, final UnaryOperator<String> label, final ResultMulti res) {
         final String m = label.apply(match);
         final String d = label.apply(prefix_down);
         final String u = label.apply(prefix_up);
-        w.write(String.valueOf(counter));
-        w.write("\t");
-        w.write(query);
-        w.write("\t");
+        final int placements = res.getNumberOfMatches();
+        final String[] cells = new String[COLUMNS.length];
+        cells[0] = String.valueOf(counter);
+        cells[1] = query;
         if (!prefix_down.equals(AnalysisMulti.UNKNOWN) && !prefix_up.equals(AnalysisMulti.UNKNOWN)) {
-            w.write(m);
+            cells[2] = m;
+        } else if (prefix_down.equals(AnalysisMulti.UNKNOWN) && !prefix_up.equals(AnalysisMulti.UNKNOWN)) {
+            cells[2] = u + "-like";
+        } else if (!prefix_down.equals(AnalysisMulti.UNKNOWN) && prefix_up.equals(AnalysisMulti.UNKNOWN)) {
+            cells[2] = d + "-like";
         } else {
-            if (prefix_down.equals(AnalysisMulti.UNKNOWN) && !prefix_up.equals(AnalysisMulti.UNKNOWN)) {
-                w.write(u + "-like");
-            } else if (!prefix_down.equals("?") && prefix_up.equals(AnalysisMulti.UNKNOWN)) {
-                w.write(d + "-like");
-            } else if (prefix_down.equals("?") && prefix_up.equals(AnalysisMulti.UNKNOWN)) {
-                w.write("");
-            } else {
-                w.write("");
-            }
+            cells[2] = "";
         }
-        w.write("\t");
-        w.write(df.format(confidence));
-        w.write("\t");
-
+        cells[3] = Prefix.CONFIDENCE_FORMAT.format(confidence);
         if (placements == 1 && !prefix_down.equals(AnalysisMulti.UNKNOWN) && !prefix_up.equals(AnalysisMulti.UNKNOWN)) {
-            w.write("[" + d + ", " + u + "]");
+            cells[4] = "[" + d + ", " + u + "]";
         } else {
-            w.write("n/a");
+            cells[4] = "n/a";
         }
-        w.write("\t");
         if (!prefix_down.equals(prefix_up)) {
             if (prefix_down.equals(AnalysisMulti.UNKNOWN) && !prefix_up.equals(AnalysisMulti.UNKNOWN)) {
-                w.write("potential for novel sub-species similar to clade " + u);
-            } else if (!prefix_down.equals("?") && prefix_up.equals(AnalysisMulti.UNKNOWN)) {
-                w.write("potential for novel sub-species similar to clade " + d);
-            } else if (prefix_down.equals("?") && prefix_up.equals(AnalysisMulti.UNKNOWN)) {
-                w.write("potential for novel sub-species different from all current sub-species");
+                cells[5] = "potential for novel sub-species similar to clade " + u;
+            } else if (!prefix_down.equals(AnalysisMulti.UNKNOWN) && prefix_up.equals(AnalysisMulti.UNKNOWN)) {
+                cells[5] = "potential for novel sub-species similar to clade " + d;
             } else {
-                w.write("potential for novel sub-species within clade " + m);
+                cells[5] = "potential for novel sub-species within clade " + m;
             }
         } else if (!confident && !match.equals(AnalysisMulti.UNKNOWN)) {
-            w.write("no confident assignment (best match: clade " + m + ")");
+            cells[5] = "no confident assignment (best match: clade " + m + ")";
         } else if (match.equals(AnalysisMulti.UNKNOWN)) {
-            w.write("potential for novel sub-species");
+            cells[5] = "potential for novel sub-species";
         } else {
-            w.write("member of clade " + m);
+            cells[5] = "member of clade " + m;
         }
-
-        w.write("\t");
-        w.write(String.valueOf(placements));
-        w.write("\t");
-        w.write(confidences(res.getAllMultiHitPrefixes(), label));
-        w.write("\t");
-        w.write(confidences(res.getAllMultiHitPrefixesDown(), label));
-        w.write("\t");
-        w.write(confidences(res.getAllMultiHitPrefixesUp(), label));
-        w.write("\t");
-        w.write(String.join("; ", res.getWarnings()));
-        w.write("\n");
-        w.flush();
+        cells[6] = String.valueOf(placements);
+        cells[7] = confidences(res.getAllMultiHitPrefixes(), label);
+        cells[8] = confidences(res.getAllMultiHitPrefixesDown(), label);
+        cells[9] = confidences(res.getAllMultiHitPrefixesUp(), label);
+        cells[10] = String.join("; ", res.getWarnings());
+        return String.join("\t", cells) + "\n";
     }
-
 
     private final static void print_help() {
         System.out.println("Usage:");

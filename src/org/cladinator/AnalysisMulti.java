@@ -21,7 +21,6 @@
 
 package org.cladinator;
 
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.SortedMap;
@@ -42,7 +41,6 @@ public final class AnalysisMulti {
     public final static Pattern DEFAULT_QUERY_PATTERN_FOR_PPLACER_TYPE = Pattern.compile("_#\\d+_M=(.+)");
     /** Placement confidences whose sum is further than this from 1 are rescaled with a warning. */
     public final static double CONFIDENCE_SUM_TOLERANCE = 1E-4;
-    private final static DecimalFormat CONF_FORMAT = new DecimalFormat("0.0###");
 
     public static ResultMulti execute(final Phylogeny p) throws UserException {
         return execute(p, DEFAULT_QUERY_PATTERN_FOR_PPLACER_TYPE, DEFAULT_SEPARATOR);
@@ -105,7 +103,7 @@ public final class AnalysisMulti {
             final PhylogenyNode qnode = qnodes.get(i);
             final double conf = confs[i];
             if (qnode.isRoot()) {
-                throw new UserException("ERROR: query \"" + query + "\" is root");
+                throw new UserException("query \"" + query + "\" is root");
             }
             if (qnode.getParent().isRoot()) {
                 // No bracketing clades either; up/down need the entry too, or their confidences do not add up to 1.
@@ -166,9 +164,9 @@ public final class AnalysisMulti {
         double sum = 0.0;
         for (int i = 0; i < qnodes.size(); ++i) {
             confs[i] = parseConfidence(query, qnodes.get(i));
-            if (confs[i] < 0.0) {
-                throw new UserException("ERROR: negative placement confidence in query node name \""
-                        + qnodes.get(i).getName() + "\"");
+            if (!(confs[i] >= 0.0) || Double.isInfinite(confs[i])) { // also catches NaN
+                throw new UserException("placement confidence in query node name \"" + qnodes.get(i).getName()
+                        + "\" is not a number between 0 and 1");
             }
             sum += confs[i];
         }
@@ -176,11 +174,11 @@ public final class AnalysisMulti {
             return confs;
         }
         if (sum <= 0.0) {
-            throw new UserException("ERROR: placement confidences of query \"" + res.getQueryNamePrefix()
+            throw new UserException("placement confidences of query \"" + res.getQueryNamePrefix()
                     + "\" add up to 0");
         }
         if (Math.abs(sum - 1.0) > CONFIDENCE_SUM_TOLERANCE) {
-            res.addWarning("placement confidences add up to " + CONF_FORMAT.format(sum)
+            res.addWarning("placement confidences add up to " + Prefix.CONFIDENCE_FORMAT.format(sum)
                     + " instead of 1, rescaled to 1");
         }
         for (int i = 0; i < confs.length; ++i) {
@@ -201,7 +199,7 @@ public final class AnalysisMulti {
         try {
             conf = Double.parseDouble(conf_str);
         } catch (final NumberFormatException ex) {
-            throw new UserException("ERROR: Could not parse confidence from \"" + conf_str + "\" from query node name \"" + n.getName() + "\"");
+            throw new UserException("could not parse a confidence from \"" + conf_str + "\" in query node name \"" + n.getName() + "\"");
         }
         return conf;
     }
