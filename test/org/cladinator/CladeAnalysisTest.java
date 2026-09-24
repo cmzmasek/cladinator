@@ -72,6 +72,10 @@ public class CladeAnalysisTest {
             System.out.println("Clade analysis many prefixes failed");
             failed = true;
         }
+        if (!testCladeAnalysisRootPlacement()) {
+            System.out.println("Clade analysis root placement failed");
+            failed = true;
+        }
         if (!failed) {
             System.out.println("OK");
         } else {
@@ -97,6 +101,9 @@ public class CladeAnalysisTest {
             return false;
         }
         if (!testCladeAnalysisManyPrefixes()) {
+            return false;
+        }
+        if (!testCladeAnalysisRootPlacement()) {
             return false;
         }
         return true;
@@ -895,6 +902,56 @@ public class CladeAnalysisTest {
         } catch (final Exception e) {
             e.printStackTrace(System.out);
             return false;
+        }
+        return true;
+    }
+
+    // A placement attached to the root has no bracketing clades: it counts as "?" in the up/down lists
+    // too, so that they still add up to 1.0 next to other placements.
+    private static boolean testCladeAnalysisRootPlacement() {
+        try {
+            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
+            final String t = "(Q_#1_M=0.3,(((A.1.1,Q_#2_M=0.7),A.1.2),(A.2.1,A.2.2)),((B.1.1,B.1.2),B.2.1))";
+            final ResultMulti res = AnalysisMulti.execute(factory.create(t, new NHXParser())[0], ".");
+            if (!isPrefixes(res.getAllMultiHitPrefixes(), "A.1", 0.7, "?", 0.3)) {
+                return false;
+            }
+            if (!isPrefixes(res.getAllMultiHitPrefixesDown(), "A.1.1", 0.7, "?", 0.3)) {
+                return false;
+            }
+            if (!isPrefixes(res.getAllMultiHitPrefixesUp(), "A.1.2", 0.7, "?", 0.3)) {
+                return false;
+            }
+            final String all_root = "(Q_#1_M=1.0,((A.1.1,A.1.2),A.2.1),((B.1.1,B.1.2),B.2.1))";
+            final ResultMulti res2 = AnalysisMulti.execute(factory.create(all_root, new NHXParser())[0], ".");
+            if (!isPrefixes(res2.getAllMultiHitPrefixes(), "?", 1.0)) {
+                return false;
+            }
+            if (!isPrefixes(res2.getAllMultiHitPrefixesDown(), "?", 1.0)) {
+                return false;
+            }
+            if (!isPrefixes(res2.getAllMultiHitPrefixesUp(), "?", 1.0)) {
+                return false;
+            }
+        } catch (final Exception e) {
+            e.printStackTrace(System.out);
+            return false;
+        }
+        return true;
+    }
+
+    // prefix_and_confidence: prefix, confidence, prefix, confidence, ...
+    private static boolean isPrefixes(final List<Prefix> l, final Object... prefix_and_confidence) {
+        if (l.size() * 2 != prefix_and_confidence.length) {
+            return false;
+        }
+        for (int i = 0; i < l.size(); ++i) {
+            if (!l.get(i).getPrefix().equals(prefix_and_confidence[2 * i])) {
+                return false;
+            }
+            if (!ForesterUtil.isEqual(l.get(i).getConfidence(), (Double) prefix_and_confidence[2 * i + 1])) {
+                return false;
+            }
         }
         return true;
     }

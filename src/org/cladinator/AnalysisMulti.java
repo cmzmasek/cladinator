@@ -98,7 +98,11 @@ public final class AnalysisMulti {
                 throw new UserException("ERROR: query \"" + query + "\" is root");
             }
             if (qnode.getParent().isRoot()) {
-                res.addGreatestCommonPrefix(UNKNOWN, parseConfidence(query, qnode));
+                // No bracketing clades either; up/down need the entry too, or their confidences do not add up to 1.
+                final double conf = parseConfidence(query, qnode);
+                res.addGreatestCommonPrefix(UNKNOWN, conf);
+                res.addGreatestCommonPrefixUp(UNKNOWN, conf);
+                res.addGreatestCommonPrefixDown(UNKNOWN, conf);
                 continue;
             }
             PhylogenyNode qnode_p = qnode.getParent();
