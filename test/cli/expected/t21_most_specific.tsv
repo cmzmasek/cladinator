@@ -1,7 +1,7 @@
-# input trees: test/data/t18_underscore_error.nwk
+# input trees: test/data/t21_most_specific.nwk
 # annotation separator: .
 # query pattern: _#\d+_M=(.+)
 # confidence cutoff: 0.7
 # non-homologous query factor: 2.0
 #Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Support	Placement count	Pendant length	Reference depth	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
-1	S1_S2				Input sequence error: Likely non-homologous query sequence		1						
+1	Q	A.1	0.9	n/a	potential for novel sub-species within clade A.1	0.9	2	0.1	0.5	A:1.0;A.1:0.9	A:1.0;A.1.1:0.9;A.2:0.1	A.1:1.0;A.1.2:0.9	sister to a single reference leaf (A.1.1: 0.9): membership in A.1.1 cannot be excluded

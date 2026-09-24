@@ -23,3 +23,9 @@ t18_underscore_error_sq	t18_underscore_error.nwk	-sq
 t13_split_a_b_c05	t13_split_a_b.nwk	-c=0.5
 t09_long_branch_nh0	t09_long_branch.nwk	-nh=0
 t19_all_errors	t19_all_errors.nwk		255
+t20_sister_to_clade	t20_sister_to_clade.nwk	
+t21_most_specific	t21_most_specific.nwk	
+t22_single_leaf_sister	t22_single_leaf_sister.nwk	
+t23_mixed_sister	t23_mixed_sister.nwk	
+t24_subclade_tie	t24_subclade_tie.nwk	
+t24_subclade_tie_c05	t24_subclade_tie.nwk	-c=0.5

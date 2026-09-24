@@ -1,7 +1,7 @@
-# input trees: test/data/t18_underscore_error.nwk
+# input trees: test/data/t23_mixed_sister.nwk
 # annotation separator: .
 # query pattern: _#\d+_M=(.+)
 # confidence cutoff: 0.7
 # non-homologous query factor: 2.0
 #Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Support	Placement count	Pendant length	Reference depth	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
-1	S1_S2				Input sequence error: Likely non-homologous query sequence		1						
+1	Q		1.0	n/a	outside all clades	1.0	1	0.1	0.4	?:1.0	?:1.0	A.2:1.0	

@@ -22,7 +22,12 @@
 package org.cladinator;
 
 import java.io.*;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.Map;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.function.UnaryOperator;
@@ -75,7 +80,9 @@ public final class cladinator {
     final static private double CUTOFF_TOLERANCE = 1E-9;
     /** The columns of the output table, in order. */
     final static private String[] COLUMNS = {"Tree #", "Query", "Assignment", "Confidence", "Brackets", "Conclusion",
-            "Placement count", "Clade confidences", "Down-tree confidences", "Up-tree confidences", "Warnings"};
+            "Support", "Placement count", "Pendant length", "Reference depth", "Clade confidences",
+            "Down-tree confidences", "Up-tree confidences", "Warnings"};
+    private final static DecimalFormat LENGTH_FORMAT = new DecimalFormat("0.0#####", DecimalFormatSymbols.getInstance(Locale.ROOT));
     final static private String NON_HOMOLOGOUS_QUERY_MESSAGE = "Input sequence error: Likely non-homologous query sequence";
 
 
@@ -451,50 +458,27 @@ public final class cladinator {
         return split_query ? query_name.split(QUERY_NAME_SPLIT_SEP) : new String[]{query_name};
     }
 
-    /**
-     * The row(s) for a result. The assignment is the first clade at or above the cutoff, looking first at the
-     * clades themselves, then at the down-tree brackets, then at the up-tree brackets; if there is none, the
-     * best-matching clade is reported without a confident assignment.
-     */
+    private static int column(final String name) {
+        return Arrays.asList(COLUMNS).indexOf(name);
+    }
+
+    /** The row(s) for a result: the classification of the query at the cutoff, one row per query name. */
     private static String resultRows(final ResultMulti res, final int counter, final Settings st) {
-        if (res.getAllMultiHitPrefixes().isEmpty()) {
-            throw new IllegalStateException("no prefixes for query \"" + res.getQueryNamePrefix() + "\" in tree #" + counter);
-        }
-        final String down = res.getAllMultiHitPrefixesDown().get(0).getPrefix();
-        final String up = res.getAllMultiHitPrefixesUp().get(0).getPrefix();
-        Prefix chosen = null;
-        for (final List<Prefix> candidates : List.of(res.getCollapsedMultiHitPrefixes(),
-                res.getCollapsedMultiHitPrefixesDown(),
-                res.getCollapsedMultiHitPrefixesUp())) {
-            for (final Prefix prefix : candidates) {
-                if ((prefix.getConfidence() >= st.cutoff() - CUTOFF_TOLERANCE) && !prefix.getPrefix().equals(AnalysisMulti.UNKNOWN)) {
-                    chosen = prefix;
-                    break;
-                }
-            }
-            if (chosen != null) {
-                break;
-            }
-        }
+        final Classification c = Classification.of(res, st.cutoff());
         final StringBuilder rows = new StringBuilder();
         for (final String query : queryNames(res.getQueryNamePrefix(), st.split_query())) {
-            if (chosen != null) {
-                rows.append(row(counter, query, chosen.getPrefix(), chosen.getConfidence(), down, up, true, st.label(), res));
-            } else {
-                final Prefix best = res.getAllMultiHitPrefixes().get(0);
-                rows.append(row(counter, query, best.getPrefix(), best.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, false, st.label(), res));
-            }
+            rows.append(row(counter, query, c, res, st.label()));
         }
         return rows.toString();
     }
 
     private static String errorRow(final int counter, final String query, final String message, final int placements) {
         final String[] cells = new String[COLUMNS.length];
-        java.util.Arrays.fill(cells, "");
-        cells[0] = String.valueOf(counter);
-        cells[1] = query;
-        cells[5] = message;
-        cells[6] = String.valueOf(placements);
+        Arrays.fill(cells, "");
+        cells[column("Tree #")] = String.valueOf(counter);
+        cells[column("Query")] = query;
+        cells[column("Conclusion")] = message;
+        cells[column("Placement count")] = String.valueOf(placements);
         return String.join("\t", cells) + "\n";
     }
 
@@ -510,50 +494,73 @@ public final class cladinator {
         return sb.toString();
     }
 
-    private static String row(final int counter, final String query, final String match, final double confidence, final String prefix_down, final String prefix_up, final boolean confident, final UnaryOperator<String> label, final ResultMulti res) {
-        final String m = label.apply(match);
-        final String d = label.apply(prefix_down);
-        final String u = label.apply(prefix_up);
-        final int placements = res.getNumberOfMatches();
+    private static String row(final int counter, final String query, final Classification c, final ResultMulti res, final UnaryOperator<String> label) {
         final String[] cells = new String[COLUMNS.length];
-        cells[0] = String.valueOf(counter);
-        cells[1] = query;
-        if (!prefix_down.equals(AnalysisMulti.UNKNOWN) && !prefix_up.equals(AnalysisMulti.UNKNOWN)) {
-            cells[2] = m;
-        } else if (prefix_down.equals(AnalysisMulti.UNKNOWN) && !prefix_up.equals(AnalysisMulti.UNKNOWN)) {
-            cells[2] = u + "-like";
-        } else if (!prefix_down.equals(AnalysisMulti.UNKNOWN) && prefix_up.equals(AnalysisMulti.UNKNOWN)) {
-            cells[2] = d + "-like";
-        } else {
-            cells[2] = "";
-        }
-        cells[3] = Prefix.CONFIDENCE_FORMAT.format(confidence);
-        if (placements == 1 && !prefix_down.equals(AnalysisMulti.UNKNOWN) && !prefix_up.equals(AnalysisMulti.UNKNOWN)) {
-            cells[4] = "[" + d + ", " + u + "]";
-        } else {
-            cells[4] = "n/a";
-        }
-        if (!prefix_down.equals(prefix_up)) {
-            if (prefix_down.equals(AnalysisMulti.UNKNOWN) && !prefix_up.equals(AnalysisMulti.UNKNOWN)) {
-                cells[5] = "potential for novel sub-species similar to clade " + u;
-            } else if (!prefix_down.equals(AnalysisMulti.UNKNOWN) && prefix_up.equals(AnalysisMulti.UNKNOWN)) {
-                cells[5] = "potential for novel sub-species similar to clade " + d;
-            } else {
-                cells[5] = "potential for novel sub-species within clade " + m;
-            }
-        } else if (!confident && !match.equals(AnalysisMulti.UNKNOWN)) {
-            cells[5] = "no confident assignment (best match: clade " + m + ")";
-        } else if (match.equals(AnalysisMulti.UNKNOWN)) {
-            cells[5] = "potential for novel sub-species";
-        } else {
-            cells[5] = "member of clade " + m;
-        }
-        cells[6] = String.valueOf(placements);
-        cells[7] = confidences(res.getAllMultiHitPrefixes(), label);
-        cells[8] = confidences(res.getAllMultiHitPrefixesDown(), label);
-        cells[9] = confidences(res.getAllMultiHitPrefixesUp(), label);
-        cells[10] = String.join("; ", res.getWarnings());
+        Arrays.fill(cells, "");
+        cells[column("Tree #")] = String.valueOf(counter);
+        cells[column("Query")] = query;
+        cells[column("Assignment")] = (c.getAssignment() != null) ? label.apply(c.getAssignment()) : "";
+        cells[column("Confidence")] = Prefix.CONFIDENCE_FORMAT.format(c.getConfidence());
+        cells[column("Brackets")] = (c.getBracketDown() != null)
+                ? "[" + label.apply(c.getBracketDown()) + ", " + label.apply(c.getBracketUp()) + "]" : "n/a";
+        cells[column("Conclusion")] = conclusionText(c, label);
+        cells[column("Support")] = Prefix.CONFIDENCE_FORMAT.format(c.getSupport());
+        cells[column("Placement count")] = String.valueOf(res.getNumberOfMatches());
+        cells[column("Pendant length")] = (c.getPendantLength() != null) ? LENGTH_FORMAT.format(c.getPendantLength()) : "";
+        cells[column("Reference depth")] = (res.getReferenceDepth() != null) ? LENGTH_FORMAT.format(res.getReferenceDepth()) : "";
+        cells[column("Clade confidences")] = confidences(res.getAllMultiHitPrefixes(), label);
+        cells[column("Down-tree confidences")] = confidences(res.getAllMultiHitPrefixesDown(), label);
+        cells[column("Up-tree confidences")] = confidences(res.getAllMultiHitPrefixesUp(), label);
+        final List<String> warnings = new ArrayList<>(res.getWarnings());
+        warnings.addAll(notes(c, label));
+        cells[column("Warnings")] = String.join("; ", warnings);
         return String.join("\t", cells) + "\n";
+    }
+
+    private static String conclusionText(final Classification c, final UnaryOperator<String> label) {
+        switch (c.getConclusion()) {
+            case MEMBER:
+                return "member of clade " + label.apply(c.getConclusionClade());
+            case NOVEL_WITHIN:
+                return "potential for novel sub-species within clade " + label.apply(c.getConclusionClade());
+            case OUTSIDE_SISTER_TO:
+                return "outside all clades, sister to clade " + label.apply(c.getConclusionClade());
+            case OUTSIDE:
+                return "outside all clades";
+            case NO_CONFIDENT_ASSIGNMENT:
+            default:
+                final List<String> best = new ArrayList<>();
+                for (final Prefix p : c.getBestMatches()) {
+                    best.add((p.getPrefix().equals(AnalysisMulti.UNKNOWN) ? "outside all clades" : "clade " + label.apply(p.getPrefix()))
+                            + " " + Prefix.CONFIDENCE_FORMAT.format(p.getConfidence()));
+                }
+                return "no confident assignment (" + (best.size() == 1 ? "best match: " : "tie: ") + String.join(", ", best) + ")";
+        }
+    }
+
+    private static List<String> notes(final Classification c, final UnaryOperator<String> label) {
+        final List<String> notes = new ArrayList<>();
+        if (!c.getCompetingSubclades().isEmpty()) {
+            final List<String> l = new ArrayList<>();
+            for (final Prefix p : c.getCompetingSubclades()) {
+                l.add(label.apply(p.getPrefix()) + " " + Prefix.CONFIDENCE_FORMAT.format(p.getConfidence()));
+            }
+            notes.add("sub-clades of " + label.apply(c.getAssignment()) + " tie at the cutoff: " + String.join(", ", l));
+        }
+        if (!c.getSingleLeafSisters().isEmpty()) {
+            final List<String> l = new ArrayList<>();
+            for (final Map.Entry<String, Double> e : c.getSingleLeafSisters().entrySet()) {
+                l.add(label.apply(e.getKey()) + ": " + Prefix.CONFIDENCE_FORMAT.format(e.getValue()));
+            }
+            if (l.size() == 1) {
+                notes.add("sister to a single reference leaf (" + l.get(0) + "): membership in "
+                        + label.apply(c.getSingleLeafSisters().keySet().iterator().next()) + " cannot be excluded");
+            } else {
+                notes.add("sister to single reference leaves (" + String.join(", ", l)
+                        + "): membership in one of them cannot be excluded");
+            }
+        }
+        return notes;
     }
 
     private final static void print_help() {

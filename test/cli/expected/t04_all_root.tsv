@@ -3,5 +3,5 @@
 # query pattern: _#\d+_M=(.+)
 # confidence cutoff: 0.7
 # non-homologous query factor: 2.0
-#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Placement count	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
-1	Q4		1.0	n/a	potential for novel sub-species	1	?:1.0	?:1.0	?:1.0	
+#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Support	Placement count	Pendant length	Reference depth	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
+1	Q4		1.0	n/a	outside all clades	1.0	1	0.1	0.3	?:1.0	?:1.0	?:1.0	the root has 3 children (unrooted tree?): the up-tree brackets depend on the root

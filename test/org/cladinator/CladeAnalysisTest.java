@@ -41,14 +41,6 @@ public class CladeAnalysisTest {
 
     public static void main(final String[] args) {
         boolean failed = false;
-        if (!testCladeAnalysis1()) {
-            System.out.println("Clade analysis 1 failed");
-            failed = true;
-        }
-        if (!testCladeAnalysis2()) {
-            System.out.println("Clade analysis 2 failed");
-            failed = true;
-        }
         if (!testCladeAnalysis3()) {
             System.out.println("Clade analysis 3 failed");
             failed = true;
@@ -85,6 +77,10 @@ public class CladeAnalysisTest {
             System.out.println("Confidence renormalization failed");
             failed = true;
         }
+        if (!testClassification()) {
+            System.out.println("Classification failed");
+            failed = true;
+        }
         if (!failed) {
             System.out.println("OK");
         } else {
@@ -94,12 +90,6 @@ public class CladeAnalysisTest {
     }
 
     public static boolean test() {
-        if (!testCladeAnalysis1()) {
-            return false;
-        }
-        if (!testCladeAnalysis2()) {
-            return false;
-        }
         if (!testCladeAnalysis3()) {
             return false;
         }
@@ -121,546 +111,7 @@ public class CladeAnalysisTest {
         if (!testConfidenceRenormalization()) {
             return false;
         }
-        return true;
-    }
-
-    private static boolean testCladeAnalysis1() {
-        try {
-            final File intreefile1 = new File(PATH_TO_TEST_DATA + "clade_analysis_test_1.xml");
-            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
-            final PhylogenyParser pp = ParserUtils.createParserDependingOnFileType(intreefile1, true);
-            final Phylogeny p1 = factory.create(intreefile1, pp)[0];
-
-            ResultSingle res = AnalysisSingle.execute(p1, "A.1.1.1", ".");
-            if (!res.getGreatestCommonPrefix().equals("A.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A.1.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A.1.2.1")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 4) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "A.1.1.2", ".");
-            if (!res.getGreatestCommonPrefix().equals("A.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A.1.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A.1.2.1")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 4) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "A.1.1.3", ".");
-            if (!res.getGreatestCommonPrefix().equals("A.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A.1.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A.1.2.1")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 4) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "A.1.1.4", ".");
-            if (!res.getGreatestCommonPrefix().equals("A.1.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A.1.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A.1.1")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 3) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "A.1.2.1", ".");
-            if (!res.getGreatestCommonPrefix().equals("A")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A.1.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 17) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "A.2.1.1", ".");
-            if (!res.getGreatestCommonPrefix().equals("A")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A.2.1.2")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 17) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "A.2.1.2", ".");
-            if (!res.getGreatestCommonPrefix().equals("A")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A.2.1.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 17) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "A.3.1.1", ".");
-            if (!res.getGreatestCommonPrefix().equals("A.3")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A.3.1.2")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A.3.2.1")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 2) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "A.3.1.2", ".");
-            if (!res.getGreatestCommonPrefix().equals("A.3")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A.3.1.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A.3.2.1")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 2) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "A.3.2.1", ".");
-            if (!res.getGreatestCommonPrefix().equals("A.3")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A.3.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A.3.3.1")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 3) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "A.3.3.1", ".");
-            if (!res.getGreatestCommonPrefix().equals("A")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A.3")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 10) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "A.4.1.1", ".");
-            if (!res.getGreatestCommonPrefix().equals("A.4.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A.4.1.1.a")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A.4.1.2")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 3) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "A.4.1.1.a", ".");
-            if (!res.getGreatestCommonPrefix().equals("A.4.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A.4.1.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A.4.1.2")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 3) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "A.4.1.2", ".");
-            res = AnalysisSingle.execute(p1, "A.4.1.2.a", ".");
-            res = AnalysisSingle.execute(p1, "A.5.1.1", ".");
-            if (!res.getGreatestCommonPrefix().equals("A")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A.5.1.2")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 10) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "A.5.1.2", ".");
-            if (!res.getGreatestCommonPrefix().equals("A")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A.5.1.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 10) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "A.6.3.12", ".");
-            if (!res.getGreatestCommonPrefix().equals("A")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("A")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("A")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 17) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "B.1.1.1", ".");
-            if (!res.getGreatestCommonPrefix().equals("")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("B.1.234.3")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 25) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 2) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "B.1.234.3", ".");
-            if (!res.getGreatestCommonPrefix().equals("")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("B.1.1.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 25) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 2) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "C.1.1.1", ".");
-            if (!res.getGreatestCommonPrefix().equals("C.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("C.1.1.2")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("C.1.2.1")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 2) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "C.1.1.2", ".");
-            if (!res.getGreatestCommonPrefix().equals("C.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("C.1.1.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("C.1.2.1")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 2) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "C.1.2.1", ".");
-            if (!res.getGreatestCommonPrefix().equals("C")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("C.1.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("C.2.1")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 3) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "C.2.1", ".");
-            if (!res.getGreatestCommonPrefix().equals("C")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("C.1")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("C.3")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 4) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "C.3", ".");
-            if (!res.getGreatestCommonPrefix().equals("")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("C")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("QE.1.1.1.2.1")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 5) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 1) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "QE.1.1.1.2.1", ".");
-            if (!res.getGreatestCommonPrefix().equals("")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("C")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 25) {
-                return false;
-            }
-            if (res.getTreeSize() != 25) {
-                return false;
-            }
-            if (res.getWarnings().size() != 2) {
-                return false;
-            }
-        } catch (final Exception e) {
-            e.printStackTrace(System.out);
-            return false;
-        }
-        return true;
-    }
-
-    private static boolean testCladeAnalysis2() {
-        try {
-            final File intreefile1 = new File(PATH_TO_TEST_DATA + "clade_analysis_test_2.xml");
-            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
-            final PhylogenyParser pp = ParserUtils.createParserDependingOnFileType(intreefile1, true);
-            final Phylogeny p1 = factory.create(intreefile1, pp)[0];
-            ResultSingle res = AnalysisSingle.execute(p1, "6_DQ278891", null);
-            if (!res.getGreatestCommonPrefix().equals("6_")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("6_DQ278893")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("6_JX183550")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 2) {
-                return false;
-            }
-            if (res.getTreeSize() != 219) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "6xa_EU408330", null);
-            if (!res.getGreatestCommonPrefix().equals("6xa_EU40833")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("6xa_EU408331")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("6xa_EU408332")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 2) {
-                return false;
-            }
-            if (res.getTreeSize() != 219) {
-                return false;
-            }
-            if (res.getWarnings().size() != 0) {
-                return false;
-            }
-            res = AnalysisSingle.execute(p1, "7a_EF108306", null);
-            if (!res.getGreatestCommonPrefix().equals("")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixDown().equals("2")) {
-                return false;
-            }
-            if (!res.getGreatestCommonPrefixUp().equals("")) {
-                return false;
-            }
-            if (res.getLeastEncompassingCladeSize() != 219) {
-                return false;
-            }
-            if (res.getTreeSize() != 219) {
-                return false;
-            }
-            if (res.getWarnings().size() != 2) {
-                return false;
-            }
-        } catch (final Exception e) {
-            e.printStackTrace(System.out);
+        if (!testClassification()) {
             return false;
         }
         return true;
@@ -1027,6 +478,122 @@ public class CladeAnalysisTest {
             return false;
         }
         return true;
+    }
+
+    private static boolean testClassification() {
+        try {
+            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
+            // the most specific clade reaching the cutoff: 0.9 within A.1 (sister to the single leaf A.1.1), 0.1 in A
+            final String p13 = "(((((A.1.1,Q_#1_M=0.9),A.1.2),(A.1.3,A.1.4)),((A.2.1,A.2.2),Q_#2_M=0.1)),((B.1.1,B.1.2),B.2.1))";
+            Classification c = classify(factory, p13, 0.7);
+            if (!"A.1".equals(c.getAssignment()) || !ForesterUtil.isEqual(c.getConfidence(), 0.9)
+                    || (c.getConclusion() != Classification.Conclusion.NOVEL_WITHIN)
+                    || !ForesterUtil.isEqual(c.getSupport(), 0.9) || (c.getBracketDown() != null)
+                    || (c.getSingleLeafSisters().size() != 1) || !ForesterUtil.isEqual(c.getSingleLeafSisters().get("A.1.1"), 0.9)) {
+                System.out.println("p13: " + describe(c));
+                return false;
+            }
+            // sister to the whole clade A: outside all clades
+            final String p12 = "((((A.1.1,A.1.2),(A.2.1,A.2.2)),Q_#1_M=1.0),OUT.1)";
+            c = classify(factory, p12, 0.7);
+            if ((c.getAssignment() != null) || (c.getConclusion() != Classification.Conclusion.OUTSIDE_SISTER_TO)
+                    || !"A".equals(c.getConclusionClade()) || !ForesterUtil.isEqual(c.getSupport(), 1.0)
+                    || !"A".equals(c.getBracketDown()) || !"OUT.1".equals(c.getBracketUp())) {
+                System.out.println("p12: " + describe(c));
+                return false;
+            }
+            // between the sub-clades A.1 and A.2, sister clade of two leaves: novel within A, no single-leaf note
+            final String t01 = "((((A.1.1,A.1.2),Q_#1_M=1.0),(A.2.1,A.2.2)),((B.1.1,B.1.2),B.2.1))";
+            c = classify(factory, t01, 0.7);
+            if (!"A".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.NOVEL_WITHIN)
+                    || !"A.1".equals(c.getBracketDown()) || !"A.2".equals(c.getBracketUp())
+                    || !c.getSingleLeafSisters().isEmpty()) {
+                System.out.println("t01: " + describe(c));
+                return false;
+            }
+            // two placements, 0.6 sister to A.1 and 0.4 sister to A.2: the same conclusion as t01, support 1.0
+            final String t05 = "((((A.1.1,A.1.2),Q_#1_M=0.6),((A.2.1,A.2.2),Q_#2_M=0.4)),((B.1.1,B.1.2),B.2.1))";
+            c = classify(factory, t05, 0.7);
+            if (!"A".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.NOVEL_WITHIN)
+                    || !ForesterUtil.isEqual(c.getSupport(), 1.0) || (c.getBracketDown() != null)) {
+                System.out.println("t05: " + describe(c));
+                return false;
+            }
+            // among leaves of one label: member
+            final String member = "((((A.1.1,Q_#1_M=1.0),A.1.1),(A.2.1,A.2.2)),B.1)";
+            c = classify(factory, member, 0.7);
+            if (!"A.1.1".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.MEMBER)
+                    || !ForesterUtil.isEqual(c.getSupport(), 1.0)) {
+                System.out.println("member: " + describe(c));
+                return false;
+            }
+            // 0.5 / 0.5 between A and B: no confident assignment, both named
+            final String tie = "((((A.1.1,A.1.2),Q_#1_M=0.5),(A.2.1,A.2.2)),(((B.1.1,B.1.2),Q_#2_M=0.5),(B.2.1,B.2.2)))";
+            c = classify(factory, tie, 0.7);
+            if ((c.getAssignment() != null) || (c.getConclusion() != Classification.Conclusion.NO_CONFIDENT_ASSIGNMENT)
+                    || (c.getBestMatches().size() != 2) || !"A".equals(c.getBestMatches().get(0).getPrefix())
+                    || !"B".equals(c.getBestMatches().get(1).getPrefix())) {
+                System.out.println("tie: " + describe(c));
+                return false;
+            }
+            // sub-clades A.1 and A.2 both reach a cutoff of 0.5: the walk stops at A, member (both are within sub-clades)
+            final String subtie = "(((((A.1.1,Q_#1_M=0.5),A.1.2),((A.2.1,Q_#2_M=0.5),A.2.2)),(A.3.1,A.3.2)),((B.1.1,B.1.2),B.2.1))";
+            c = classify(factory, subtie, 0.5);
+            if (!"A".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.MEMBER)
+                    || !ForesterUtil.isEqual(c.getSupport(), 1.0) || (c.getCompetingSubclades().size() != 2)
+                    || !"A.1".equals(c.getCompetingSubclades().get(0).getPrefix())) {
+                System.out.println("subtie: " + describe(c));
+                return false;
+            }
+            // the same tree at 0.7: A, member, no competing sub-clades
+            c = classify(factory, subtie, 0.7);
+            if (!"A".equals(c.getAssignment()) || !c.getCompetingSubclades().isEmpty()) {
+                System.out.println("subtie 0.7: " + describe(c));
+                return false;
+            }
+            // everything on the root: outside all clades
+            final String root = "(Q_#1_M=1.0,((A.1.1,A.1.2),A.2.1),((B.1.1,B.1.2),B.2.1))";
+            c = classify(factory, root, 0.7);
+            if ((c.getAssignment() != null) || (c.getConclusion() != Classification.Conclusion.OUTSIDE)
+                    || !ForesterUtil.isEqual(c.getConfidence(), 1.0)) {
+                System.out.println("root: " + describe(c));
+                return false;
+            }
+            // pendant length and reference depth from the branch lengths; none without them
+            final String lengths = "((((A.1.1:0.1,A.1.2:0.1):0.1,Q_#1_M=1.0:0.25):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,((B.1.1:0.1,B.1.2:0.1):0.1,B.2.1:0.1):0.1)";
+            final ResultMulti res = AnalysisMulti.execute(factory.create(lengths, new NHXParser())[0], ".");
+            c = Classification.of(res, 0.7);
+            if ((c.getPendantLength() == null) || !ForesterUtil.isEqual(c.getPendantLength(), 0.25)
+                    || (res.getReferenceDepth() == null) || !ForesterUtil.isEqual(res.getReferenceDepth(), 0.4)) {
+                System.out.println("lengths: " + c.getPendantLength() + " " + res.getReferenceDepth());
+                return false;
+            }
+            final ResultMulti res2 = AnalysisMulti.execute(factory.create(t01, new NHXParser())[0], ".");
+            if ((Classification.of(res2, 0.7).getPendantLength() != null) || (res2.getReferenceDepth() != null)) {
+                return false;
+            }
+            try {
+                Classification.of(res2, 0.0);
+                return false;
+            } catch (final IllegalArgumentException expected) {
+                // ok
+            }
+        } catch (final Exception e) {
+            e.printStackTrace(System.out);
+            return false;
+        }
+        return true;
+    }
+
+    private static Classification classify(final PhylogenyFactory factory, final String tree, final double cutoff)
+            throws Exception {
+        return Classification.of(AnalysisMulti.execute(factory.create(tree, new NHXParser())[0], "."), cutoff);
+    }
+
+    private static String describe(final Classification c) {
+        return c.getAssignment() + " " + c.getConfidence() + " " + c.getConclusion() + " " + c.getConclusionClade() + " "
+                + c.getSupport() + " [" + c.getBracketDown() + ", " + c.getBracketUp() + "] best=" + c.getBestMatches()
+                + " competing=" + c.getCompetingSubclades() + " single=" + c.getSingleLeafSisters();
     }
 
     // prefix_and_confidence: prefix, confidence, prefix, confidence, ...

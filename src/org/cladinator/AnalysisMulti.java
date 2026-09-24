@@ -99,9 +99,15 @@ public final class AnalysisMulti {
         res.setTotalNumberOfMatches(qnodes.size());
         res.setReferenceTreeNumberOfExternalNodes(p.getNumberOfExternalNodes() - qnodes.size());
         final double[] confs = normalizedConfidences(query, qnodes, res);
+        res.setReferenceDepth(referenceDepth(p, query));
+        if (p.getRoot().getNumberOfDescendants() > 2) {
+            res.addWarning("the root has " + p.getRoot().getNumberOfDescendants()
+                    + " children (unrooted tree?): the up-tree brackets depend on the root");
+        }
         for (int i = 0; i < qnodes.size(); ++i) {
             final PhylogenyNode qnode = qnodes.get(i);
             final double conf = confs[i];
+            final double pendant = (qnode.getDistanceToParent() >= 0.0) ? qnode.getDistanceToParent() : -1.0;
             if (qnode.isRoot()) {
                 throw new UserException("query \"" + query + "\" is root");
             }
@@ -110,6 +116,7 @@ public final class AnalysisMulti {
                 res.addGreatestCommonPrefix(UNKNOWN, conf);
                 res.addGreatestCommonPrefixUp(UNKNOWN, conf);
                 res.addGreatestCommonPrefixDown(UNKNOWN, conf);
+                res.addPlacement(new Placement(conf, UNKNOWN, UNKNOWN, UNKNOWN, false, pendant));
                 continue;
             }
             PhylogenyNode qnode_p = qnode.getParent();
@@ -130,23 +137,15 @@ public final class AnalysisMulti {
                 }
             }
             final String greatest_common_prefix = ForesterUtil.greatestCommonPrefix(qnode_ext_nodes_names, separator);
-            if (!ForesterUtil.isEmpty(greatest_common_prefix)) {
-                res.addGreatestCommonPrefix(greatest_common_prefix, conf);
-            } else {
-                res.addGreatestCommonPrefix(UNKNOWN, conf);
-            }
+            final String clade = ForesterUtil.isEmpty(greatest_common_prefix) ? UNKNOWN : greatest_common_prefix;
+            res.addGreatestCommonPrefix(clade, conf);
             final String greatest_common_prefix_up = analyzeSiblings(qnode_p, qnode_pp, separator, query);
-            if (!ForesterUtil.isEmpty(greatest_common_prefix_up)) {
-                res.addGreatestCommonPrefixUp(greatest_common_prefix_up, conf);
-            } else {
-                res.addGreatestCommonPrefixUp(UNKNOWN, conf);
-            }
+            final String up = ForesterUtil.isEmpty(greatest_common_prefix_up) ? UNKNOWN : greatest_common_prefix_up;
+            res.addGreatestCommonPrefixUp(up, conf);
             final String greatest_common_prefix_down = analyzeSiblings(qnode, qnode_p, separator, query);
-            if (!ForesterUtil.isEmpty(greatest_common_prefix_down)) {
-                res.addGreatestCommonPrefixDown(greatest_common_prefix_down, conf);
-            } else {
-                res.addGreatestCommonPrefixDown(UNKNOWN, conf);
-            }
+            final String down = ForesterUtil.isEmpty(greatest_common_prefix_down) ? UNKNOWN : greatest_common_prefix_down;
+            res.addGreatestCommonPrefixDown(down, conf);
+            res.addPlacement(new Placement(conf, clade, down, up, countSiblingLeaves(qnode, qnode_p, query) == 1, pendant));
         }
         res.analyze();
         return res;
@@ -258,6 +257,33 @@ public final class AnalysisMulti {
             }
             node.setName(name.replaceAll("\\s+", " "));
         }
+    }
+
+    /** The number of reference leaves in the sister clade(s) of child under parent. */
+    private static int countSiblingLeaves(final PhylogenyNode child, final PhylogenyNode parent, final Pattern query) {
+        int n = 0;
+        for (final PhylogenyNode d : parent.getDescendants()) {
+            if (d != child) {
+                for (final PhylogenyNode leaf : d.getAllExternalDescendants()) {
+                    if (!query.matcher(leaf.getName()).find()) {
+                        ++n;
+                    }
+                }
+            }
+        }
+        return n;
+    }
+
+    /** The distance to the root of the farthest reference leaf, or null if the tree has no branch lengths. */
+    private static Double referenceDepth(final Phylogeny p, final Pattern query) {
+        double max = 0.0;
+        for (final PhylogenyNodeIterator it = p.iteratorExternalForward(); it.hasNext(); ) {
+            final PhylogenyNode n = it.next();
+            if (!query.matcher(n.getName()).find()) {
+                max = Math.max(max, n.calculateDistanceToRoot());
+            }
+        }
+        return (max > 0.0) ? max : null;
     }
 
     private final static String analyzeSiblings(final PhylogenyNode child,

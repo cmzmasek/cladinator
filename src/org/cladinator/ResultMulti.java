@@ -49,6 +49,8 @@ public final class ResultMulti {
     private int _ref_tree_ext_nodes = 0;
     private String _query_name_prefix = "";
     private final List<String> _warnings = new ArrayList<String>();
+    private final List<Placement> _placements = new ArrayList<Placement>();
+    private Double _reference_depth = null;
 
     ResultMulti(final String separator) {
         if (ForesterUtil.isEmpty(separator)) {
@@ -98,6 +100,28 @@ public final class ResultMulti {
 
     public int getReferenceTreeNumberOfExternalNodes() {
         return _ref_tree_ext_nodes;
+    }
+
+    public String getSeparator() {
+        return _separator;
+    }
+
+    /** The placements of the query, in the order of the query nodes in the tree. */
+    public List<Placement> getPlacements() {
+        return Collections.unmodifiableList(_placements);
+    }
+
+    void addPlacement(final Placement placement) {
+        _placements.add(placement);
+    }
+
+    /** The distance to the root of the farthest reference leaf, or null if the tree has no branch lengths. */
+    public Double getReferenceDepth() {
+        return _reference_depth;
+    }
+
+    void setReferenceDepth(final Double reference_depth) {
+        _reference_depth = reference_depth;
     }
 
     /** Problems with the input that did not prevent the analysis (e.g. rescaled confidences); empty if none. */

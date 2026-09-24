@@ -3,6 +3,6 @@
 # query pattern: _#\d+_M=(.+)
 # confidence cutoff: 0.7
 # non-homologous query factor: 2.0
-#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Placement count	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
-1	QX_QY	A	1.0	[A.1, A.2]	potential for novel sub-species within clade A	1	A:1.0	A.1:1.0	A.2:1.0	
-2	Q13		0.6	n/a	no confident assignment (best match: clade A)	2	A:0.6;B:0.4	A.1:0.6;B.1:0.4	A.2:0.6;B.2:0.4	
+#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Support	Placement count	Pendant length	Reference depth	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
+1	QX_QY	A	1.0	[A.1, A.2]	potential for novel sub-species within clade A	1.0	1	0.1	0.4	A:1.0	A.1:1.0	A.2:1.0	
+2	Q13		0.6	n/a	no confident assignment (best match: clade A 0.6)	0.6	2	0.1	0.4	A:0.6;B:0.4	A.1:0.6;B.1:0.4	A.2:0.6;B.2:0.4	

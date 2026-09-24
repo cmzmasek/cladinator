@@ -4,5 +4,5 @@
 # confidence cutoff: 0.7
 # non-homologous query factor: 2.0
 # annotation separator removed from clade names in this table
-#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Placement count	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
-1	Q1	A	1.0	[A1, A2]	potential for novel sub-species within clade A	1	A:1.0	A1:1.0	A2:1.0	
+#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Support	Placement count	Pendant length	Reference depth	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
+1	Q1	A	1.0	[A1, A2]	potential for novel sub-species within clade A	1.0	1	0.1	0.4	A:1.0	A1:1.0	A2:1.0	

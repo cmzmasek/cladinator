@@ -4,5 +4,5 @@
 # confidence cutoff: 0.7
 # non-homologous query factor: 2.0
 # annotation separator removed from clade names in this table
-#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Placement count	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
-1	Q3	A1	0.7	n/a	potential for novel sub-species within clade A1	2	A1:0.7;?:0.3	A11:0.7;?:0.3	A12:0.7;?:0.3	
+#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Support	Placement count	Pendant length	Reference depth	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
+1	Q3	A1	0.7	n/a	potential for novel sub-species within clade A1	0.7	2	0.1	0.4	A1:0.7;?:0.3	A11:0.7;?:0.3	A12:0.7;?:0.3	the root has 3 children (unrooted tree?): the up-tree brackets depend on the root; sister to a single reference leaf (A11: 0.7): membership in A11 cannot be excluded
