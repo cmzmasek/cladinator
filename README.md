@@ -49,7 +49,10 @@ Options:
 | `-xk` | keep extra annotations (e.g. `Q16611\|A.1.1` becomes `A.1.1.Q16611`) |
 | `-S=<pattern>` | special processing with a pattern (e.g. `(\d+)([a-z]+)_.+` changes `6q_EF42` to `6.q`) |
 | `-rs` | remove the annotation separator from clade names in the output (e.g. `A.1.2` becomes `A12`) |
-| `--q=<pattern>` | expert option: regular expression for query names (default: `_#\d+_M=(.+)`) |
+| `-sq` | split query names at `_` and print one row per part (e.g. `S1_S2` gives rows for `S1` and `S2`) |
+| `-c=<cutoff>` | minimum summed placement confidence for assigning a clade (default: 0.7) |
+| `-nh=<factor>` | a query is reported as likely non-homologous when all its placements are at least `<factor>` times as far from the root as the farthest reference leaf (default: 2, `0` turns the check off) |
+| `-q=<pattern>` | expert option: regular expression for query names (default: `_#\d+_M=(.+)`) |
 
 Examples:
 
@@ -65,40 +68,63 @@ Notes on options:
   `,`, `;`, `(`, `)`, `[`, `]`), because the tree cannot be read then.
 - `-rs` only changes how names are printed, not the analysis. It can make
   different clades look the same: `A.1.1` and `A.11` both print as `A11`.
+- An existing output file is not overwritten; the program stops with
+  `[...] already exists`.
 
 ## Output
 
 The results are printed and, if an output file is given, written to it as a
-tab-separated table with one row per query and tree:
+tab-separated table. It starts with `#` lines recording the program version
+and the settings of the run (input file, separator, query pattern, cutoff,
+non-homologous factor, and any mapping or processing options), then the
+column names, then one row per query and tree:
 
 | Column | Content |
 |---|---|
 | `Tree #` | number of the tree in the input file |
-| `Query` | query name (a name containing `_`, such as `QX_QY`, gives one row per part) |
+| `Query` | query name, i.e. the node name before the query pattern (with `-sq`, a name such as `S1_S2` gives one row per part) |
 | `Assignment` | the clade assigned; `X-like` when only one of the bracketing clades is known; empty when there is no assignment |
 | `Confidence` | summed placement confidence of the assignment (or of the best match) |
 | `Brackets` | the down- and up-tree bracketing clades, for a single placement |
 | `Conclusion` | see below |
 | `Placement count` | number of placements of the query in the tree |
+| `Clade confidences` | every clade prefix with its summed confidence, e.g. `A:1.0;A.1:0.9;A.2:0.1`; the basis of the assignment |
+| `Down-tree confidences` | the same for the down-tree bracketing clades (the query's sister clades) |
+| `Up-tree confidences` | the same for the up-tree bracketing clades |
+| `Warnings` | e.g. `placement confidences add up to 0.99 instead of 1, rescaled to 1` |
 
-A clade is assigned when it reaches a summed confidence of at least 0.7.
-Possible conclusions:
+Placement confidences (pplacer's likelihood weight ratios, `M=`) are expected
+to add up to 1 for a query, and are always rescaled to exactly 1 before the
+analysis. Placement programs can drop low-weight placements without rescaling
+the rest; if the sum differs from 1 by more than 0.0001, the row says so in
+`Warnings`.
+
+A clade is assigned when it reaches a summed confidence of at least the
+cutoff (`-c`, default 0.7). Possible conclusions:
 
 - `member of clade X`
 - `potential for novel sub-species within clade X`
 - `potential for novel sub-species similar to clade X`
-- `potential for novel sub-species different from all current sub-species`
 - `potential for novel sub-species` (e.g. all placements on the root)
-- `no confident assignment (best match: clade X)`: no clade reaches 0.7
+- `no confident assignment (best match: clade X)`: no clade reaches the cutoff
 
 Problems with a tree are reported in its row, and the other trees are
 still analyzed:
 
 - `Input error: no query found (query pattern: ...)`: no node matches the
   query pattern
+- `Input error: ...`: other problems with the tree, e.g. query nodes with
+  different names in one tree, a leaf missing from the mapping file, a
+  malformed annotation, or placement confidences that add up to 0
 - `Input sequence error: Likely non-homologous query sequence`: every
-  placement of the query is at least twice as far from the root as the
-  farthest reference leaf (only checked when the tree has branch lengths)
+  placement of the query is at least `-nh` times (default 2) as far from the
+  root as the farthest reference leaf (only checked when the tree has branch
+  lengths)
+
+After the table, a summary line counts the trees with a result, with a likely
+non-homologous query, and with input errors. The exit status is 0 unless the
+program could not run at all (bad options, unreadable input, existing output
+file) or no tree at all could be analyzed.
 
 ## Other tools
 
@@ -111,6 +137,21 @@ java -cp dist/cladinator.jar org.cladinator.cladinator_tree_prepare <in-tree> <o
 ```
 
 ## Changes
+
+**Unreleased**
+
+- Placement confidences that do not add up to 1 are rescaled, with a warning
+  in the new `Warnings` column, instead of stopping the run.
+- Any problem with one tree (e.g. two different queries in it, a leaf missing
+  from the mapping file) is reported in that tree's row; the run continues.
+- Query names are no longer split at `_` by default (a pplacer query
+  `CED9_CAEBR` now gives one row); `-sq` restores the old behavior, for
+  result rows and error rows alike.
+- New options `-c` (confidence cutoff, was fixed at 0.7) and `-nh`
+  (non-homologous query factor, was fixed at 2; `0` turns the check off).
+- The table starts with `#` lines recording the version and settings of the
+  run, and has three new columns with the full clade, down-tree and up-tree
+  confidence distributions.
 
 **3.1.0** (2026-09-24)
 
