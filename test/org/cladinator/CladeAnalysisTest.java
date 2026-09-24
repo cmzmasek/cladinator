@@ -81,6 +81,10 @@ public class CladeAnalysisTest {
             System.out.println("Classification failed");
             failed = true;
         }
+        if (!testDistanceThreshold()) {
+            System.out.println("Distance threshold failed");
+            failed = true;
+        }
         if (!failed) {
             System.out.println("OK");
         } else {
@@ -112,6 +116,9 @@ public class CladeAnalysisTest {
             return false;
         }
         if (!testClassification()) {
+            return false;
+        }
+        if (!testDistanceThreshold()) {
             return false;
         }
         return true;
@@ -574,6 +581,91 @@ public class CladeAnalysisTest {
             }
             try {
                 Classification.of(res2, 0.0);
+                return false;
+            } catch (final IllegalArgumentException expected) {
+                // ok
+            }
+        } catch (final Exception e) {
+            e.printStackTrace(System.out);
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean testDistanceThreshold() {
+        try {
+            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
+            // sister to the single leaf A.1.1 at 0.001: distance to A.1.1 is 0.101
+            final String p7 = "((((A.1.1:0.1,Q_#1_M=1.0:0.001):0.1,A.1.2:0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,((B.1.1:0.1,B.1.2:0.1):0.1,B.2.1:0.1):0.1)";
+            final ResultMulti res7 = AnalysisMulti.execute(factory.create(p7, new NHXParser())[0], ".");
+            final Placement pl = res7.getPlacements().get(0);
+            if (!"A.1.1".equals(pl.nearestLeaf()) || !ForesterUtil.isEqual(pl.nearestDistance(), 0.101)) {
+                System.out.println("nearest: " + pl);
+                return false;
+            }
+            Classification c = Classification.of(res7, 0.7, 0.2);
+            if (!"A.1.1".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.MEMBER)
+                    || !"A.1.1".equals(c.getConclusionClade()) || !ForesterUtil.isEqual(c.getSupport(), 1.0)
+                    || !c.isByDistance() || !c.getSingleLeafSisters().isEmpty()
+                    || !"A.1.1".equals(c.getNearestLeaf()) || !ForesterUtil.isEqual(c.getNearestDistance(), 0.101)) {
+                System.out.println("p7 d=0.2: " + describe(c));
+                return false;
+            }
+            c = Classification.of(res7, 0.7, 0.05);
+            if (!"A.1".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.NOVEL_WITHIN)
+                    || !"A.1".equals(c.getConclusionClade()) || !ForesterUtil.isEqual(c.getSupport(), 1.0) || !c.isByDistance()) {
+                System.out.println("p7 d=0.05: " + describe(c));
+                return false;
+            }
+            c = Classification.of(res7, 0.7);
+            if (c.isByDistance() || (c.getConclusion() != Classification.Conclusion.NOVEL_WITHIN) || c.getSingleLeafSisters().isEmpty()) {
+                System.out.println("p7 no d: " + describe(c));
+                return false;
+            }
+            // nested among A.1.1 leaves (member by topology) but on a long branch: novel by distance
+            final String far = "((((A.1.1:0.1,Q_#1_M=1.0:2.0):0.1,A.1.1:0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)";
+            final ResultMulti res_far = AnalysisMulti.execute(factory.create(far, new NHXParser())[0], ".");
+            if (Classification.of(res_far, 0.7).getConclusion() != Classification.Conclusion.MEMBER) {
+                return false;
+            }
+            c = Classification.of(res_far, 0.7, 0.5);
+            if (!"A.1.1".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.NOVEL_WITHIN)
+                    || !ForesterUtil.isEqual(c.getSupport(), 1.0)) {
+                System.out.println("far: " + describe(c));
+                return false;
+            }
+            // the nearest leaf can be in the uncle clade: sister at 0.9, uncle leaf at 0.3
+            final String uncle = "((((A.1.1:0.9,Q_#1_M=1.0:0.1):0.1,A.1.2:0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)";
+            final Placement pu = AnalysisMulti.execute(factory.create(uncle, new NHXParser())[0], ".").getPlacements().get(0);
+            if (!"A.1.2".equals(pu.nearestLeaf()) || !ForesterUtil.isEqual(pu.nearestDistance(), 0.3)) {
+                System.out.println("uncle: " + pu);
+                return false;
+            }
+            // two placements: 0.6 close to A.1.1, 0.4 far: member of A.1.1 with support 0.6, assignment stays A.1
+            final String mixed = "(((((A.1.1:0.1,Q_#1_M=0.6:0.001):0.1,A.1.2:0.1):0.1,((A.1.3:0.1,Q_#2_M=0.4:1.0):0.1,A.1.4:0.1):0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)";
+            c = Classification.of(AnalysisMulti.execute(factory.create(mixed, new NHXParser())[0], "."), 0.7, 0.2);
+            if (!"A.1".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.MEMBER)
+                    || !"A.1.1".equals(c.getConclusionClade()) || !ForesterUtil.isEqual(c.getSupport(), 0.6)) {
+                System.out.println("mixed: " + describe(c));
+                return false;
+            }
+            // close to A.1.1 (0.5) and A.1.2 (0.5): member of their common clade A.1
+            final String tied = "(((((A.1.1:0.1,Q_#1_M=0.5:0.001):0.1,(A.1.2:0.1,Q_#2_M=0.5:0.001):0.1):0.1,(A.1.3:0.1,A.1.4:0.1):0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)";
+            c = Classification.of(AnalysisMulti.execute(factory.create(tied, new NHXParser())[0], "."), 0.7, 0.2);
+            if (!"A.1".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.MEMBER)
+                    || !"A.1".equals(c.getConclusionClade()) || !ForesterUtil.isEqual(c.getSupport(), 1.0) || !c.isByDistance()) {
+                System.out.println("tied: " + describe(c));
+                return false;
+            }
+            // no branch lengths: the threshold is not applied
+            final String none = "((((A.1.1,Q_#1_M=1.0),A.1.2),(A.2.1,A.2.2)),B.1)";
+            c = Classification.of(AnalysisMulti.execute(factory.create(none, new NHXParser())[0], "."), 0.7, 0.2);
+            if (c.isByDistance() || !c.isDistanceNotApplied() || (c.getConclusion() != Classification.Conclusion.NOVEL_WITHIN)) {
+                System.out.println("none: " + describe(c));
+                return false;
+            }
+            try {
+                Classification.of(res7, 0.7, -1.0);
                 return false;
             } catch (final IllegalArgumentException expected) {
                 // ok

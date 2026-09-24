@@ -29,3 +29,7 @@ t22_single_leaf_sister	t22_single_leaf_sister.nwk
 t23_mixed_sister	t23_mixed_sister.nwk	
 t24_subclade_tie	t24_subclade_tie.nwk	
 t24_subclade_tie_c05	t24_subclade_tie.nwk	-c=0.5
+t22_single_leaf_sister_d02	t22_single_leaf_sister.nwk	-d=0.2
+t22_single_leaf_sister_d005	t22_single_leaf_sister.nwk	-d=0.05
+t15_no_branch_lengths_d	t15_no_branch_lengths.nwk	-d=0.1
+t25_distance_mixed	t25_distance_mixed.nwk	-d=0.2

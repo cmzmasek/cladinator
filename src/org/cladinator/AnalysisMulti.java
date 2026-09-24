@@ -99,7 +99,8 @@ public final class AnalysisMulti {
         res.setTotalNumberOfMatches(qnodes.size());
         res.setReferenceTreeNumberOfExternalNodes(p.getNumberOfExternalNodes() - qnodes.size());
         final double[] confs = normalizedConfidences(query, qnodes, res);
-        res.setReferenceDepth(referenceDepth(p, query));
+        final Double reference_depth = referenceDepth(p, query);
+        res.setReferenceDepth(reference_depth);
         if (p.getRoot().getNumberOfDescendants() > 2) {
             res.addWarning("the root has " + p.getRoot().getNumberOfDescendants()
                     + " children (unrooted tree?): the up-tree brackets depend on the root");
@@ -108,6 +109,10 @@ public final class AnalysisMulti {
             final PhylogenyNode qnode = qnodes.get(i);
             final double conf = confs[i];
             final double pendant = (qnode.getDistanceToParent() >= 0.0) ? qnode.getDistanceToParent() : -1.0;
+            final Nearest nearest = nearestReferenceLeaf(qnode, query);
+            final String nearest_leaf = (nearest.leaf() != null) ? nearest.leaf().getName() : null;
+            // without branch lengths every leaf is at distance 0: the nearest one is meaningless
+            final double nearest_distance = (reference_depth != null) ? nearest.distance() : -1.0;
             if (qnode.isRoot()) {
                 throw new UserException("query \"" + query + "\" is root");
             }
@@ -116,7 +121,7 @@ public final class AnalysisMulti {
                 res.addGreatestCommonPrefix(UNKNOWN, conf);
                 res.addGreatestCommonPrefixUp(UNKNOWN, conf);
                 res.addGreatestCommonPrefixDown(UNKNOWN, conf);
-                res.addPlacement(new Placement(conf, UNKNOWN, UNKNOWN, UNKNOWN, false, pendant));
+                res.addPlacement(new Placement(conf, UNKNOWN, UNKNOWN, UNKNOWN, false, pendant, nearest_leaf, nearest_distance));
                 continue;
             }
             PhylogenyNode qnode_p = qnode.getParent();
@@ -145,7 +150,7 @@ public final class AnalysisMulti {
             final String greatest_common_prefix_down = analyzeSiblings(qnode, qnode_p, separator, query);
             final String down = ForesterUtil.isEmpty(greatest_common_prefix_down) ? UNKNOWN : greatest_common_prefix_down;
             res.addGreatestCommonPrefixDown(down, conf);
-            res.addPlacement(new Placement(conf, clade, down, up, countSiblingLeaves(qnode, qnode_p, query) == 1, pendant));
+            res.addPlacement(new Placement(conf, clade, down, up, countSiblingLeaves(qnode, qnode_p, query) == 1, pendant, nearest_leaf, nearest_distance));
         }
         res.analyze();
         return res;
@@ -272,6 +277,52 @@ public final class AnalysisMulti {
             }
         }
         return n;
+    }
+
+    /** A reference leaf and the path length to it; leaf is null if there is none. */
+    private record Nearest(PhylogenyNode leaf, double distance) {
+    }
+
+    /** A branch length; a missing one counts as 0. */
+    private static double length(final PhylogenyNode n) {
+        return Math.max(0.0, n.getDistanceToParent());
+    }
+
+    /** The reference leaf nearest to n within n's subtree, and its distance from n. */
+    private static Nearest nearestInSubtree(final PhylogenyNode n, final Pattern query) {
+        if (n.isExternal()) {
+            return query.matcher(n.getName()).find() ? new Nearest(null, Double.POSITIVE_INFINITY) : new Nearest(n, 0.0);
+        }
+        Nearest best = new Nearest(null, Double.POSITIVE_INFINITY);
+        for (final PhylogenyNode c : n.getDescendants()) {
+            final Nearest s = nearestInSubtree(c, query);
+            if ((s.leaf() != null) && (s.distance() + length(c) < best.distance())) {
+                best = new Nearest(s.leaf(), s.distance() + length(c));
+            }
+        }
+        return best;
+    }
+
+    /** The reference leaf nearest to a query node by path length (the first of equals), and its distance. */
+    static Nearest nearestReferenceLeaf(final PhylogenyNode qnode, final Pattern query) {
+        Nearest best = new Nearest(null, Double.POSITIVE_INFINITY);
+        double acc = length(qnode);
+        PhylogenyNode from = qnode;
+        PhylogenyNode a = qnode.getParent();
+        while (a != null) {
+            for (final PhylogenyNode c : a.getDescendants()) {
+                if (c != from) {
+                    final Nearest s = nearestInSubtree(c, query);
+                    if ((s.leaf() != null) && (acc + length(c) + s.distance() < best.distance())) {
+                        best = new Nearest(s.leaf(), acc + length(c) + s.distance());
+                    }
+                }
+            }
+            acc += length(a);
+            from = a;
+            a = a.getParent();
+        }
+        return best;
     }
 
     /** The distance to the root of the farthest reference leaf, or null if the tree has no branch lengths. */

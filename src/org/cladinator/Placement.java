@@ -33,15 +33,24 @@ package org.cladinator;
  *                           {@link AnalysisMulti#UNKNOWN} if there is none
  * @param sisterIsSingleLeaf whether the sister clade is a single reference leaf
  * @param pendantLength      the branch length of the query node; negative if the tree has none
+ * @param nearestLeaf        the label of the reference leaf closest to the query by path length (the first of
+ *                           equals); null if there is no reference leaf
+ * @param nearestDistance    the path length to that leaf; negative if the tree has no branch lengths
  */
 public record Placement(double weight,
                         String clade,
                         String down,
                         String up,
                         boolean sisterIsSingleLeaf,
-                        double pendantLength) {
+                        double pendantLength,
+                        String nearestLeaf,
+                        double nearestDistance) {
 
     public boolean hasPendantLength() {
         return pendantLength >= 0.0;
+    }
+
+    public boolean hasNearestDistance() {
+        return (nearestLeaf != null) && (nearestDistance >= 0.0);
     }
 }

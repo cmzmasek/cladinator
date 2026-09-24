@@ -69,6 +69,7 @@ public final class cladinator {
     final static private String SPLIT_QUERY_OPTION = "sq";
     final static private String CUTOFF_OPTION = "c";
     final static private String NON_HOMOLOGOUS_FACTOR_OPTION = "nh";
+    final static private String DISTANCE_THRESHOLD_OPTION = "d";
     final static private double CUTOFF_DEFAULT = 0.7;
     final static private double NON_HOMOLOGOUS_FACTOR_DEFAULT = 2.0;
     final static private String QUERY_NAME_SPLIT_SEP = "_";
@@ -80,8 +81,8 @@ public final class cladinator {
     final static private double CUTOFF_TOLERANCE = 1E-9;
     /** The columns of the output table, in order. */
     final static private String[] COLUMNS = {"Tree #", "Query", "Assignment", "Confidence", "Brackets", "Conclusion",
-            "Support", "Placement count", "Pendant length", "Reference depth", "Clade confidences",
-            "Down-tree confidences", "Up-tree confidences", "Warnings"};
+            "Support", "Placement count", "Pendant length", "Reference depth", "Nearest leaf", "Nearest distance",
+            "Clade confidences", "Down-tree confidences", "Up-tree confidences", "Warnings"};
     private final static DecimalFormat LENGTH_FORMAT = new DecimalFormat("0.0#####", DecimalFormatSymbols.getInstance(Locale.ROOT));
     final static private String NON_HOMOLOGOUS_QUERY_MESSAGE = "Input sequence error: Likely non-homologous query sequence";
 
@@ -116,6 +117,7 @@ public final class cladinator {
             allowed_options.add(SPLIT_QUERY_OPTION);
             allowed_options.add(CUTOFF_OPTION);
             allowed_options.add(NON_HOMOLOGOUS_FACTOR_OPTION);
+            allowed_options.add(DISTANCE_THRESHOLD_OPTION);
             final String dissallowed_options = cla.validateAllowedOptionsAsString(allowed_options);
             if (dissallowed_options.length() > 0) {
                 ForesterUtil.fatalError(PRG_NAME, "unknown option(s): " + dissallowed_options);
@@ -253,10 +255,22 @@ public final class cladinator {
                 }
             }
 
+            Double distance_threshold = null;
+            if (cla.isOptionSet(DISTANCE_THRESHOLD_OPTION)) {
+                if (!cla.isOptionValueSet(DISTANCE_THRESHOLD_OPTION)) {
+                    ForesterUtil.fatalError(PRG_NAME, "no value for distance threshold");
+                }
+                distance_threshold = cla.getOptionValueAsDouble(DISTANCE_THRESHOLD_OPTION);
+                if (!(distance_threshold >= 0) || Double.isInfinite(distance_threshold)) {
+                    ForesterUtil.fatalError(PRG_NAME, "distance threshold must be a non-negative number");
+                }
+            }
+
             final String sep = separator;
             final UnaryOperator<String> label = remove_annotation_sep ? (name -> name.replace(sep, "")) : (name -> name);
             final Settings settings = new Settings(pattern, separator, map, extra_processing1, extra_processing1_sep,
-                    extra_processing1_keep, special_processing, special_pattern, label, split_query, cutoff, nh_factor);
+                    extra_processing1_keep, special_processing, special_pattern, label, split_query, cutoff, nh_factor,
+                    distance_threshold);
 
             System.out.println("Input tree                 : " + intreefile);
             if (mapping_file != null) {
@@ -280,6 +294,9 @@ public final class cladinator {
                 System.out.println("Special processing pattern : " + special_pattern);
             }
             System.out.println("Confidence cutoff          : " + cutoff);
+            if (distance_threshold != null) {
+                System.out.println("Distance threshold         : " + distance_threshold);
+            }
             if (nh_factor > 0) {
                 System.out.println("Non-homologous query factor: " + nh_factor);
             } else {
@@ -323,6 +340,9 @@ public final class cladinator {
             header.append("# annotation separator: " + separator + "\n");
             header.append("# query pattern: " + pattern + "\n");
             header.append("# confidence cutoff: " + cutoff + "\n");
+            if (distance_threshold != null) {
+                header.append("# distance threshold: " + distance_threshold + "\n");
+            }
             header.append("# non-homologous query factor: " + (nh_factor > 0 ? String.valueOf(nh_factor) : "off") + "\n");
             if (extra_processing1) {
                 header.append("# extra processing: separator \"" + extra_processing1_sep + "\", keep extra: " + extra_processing1_keep + "\n");
@@ -395,7 +415,9 @@ public final class cladinator {
                             /** Minimum summed placement confidence for a clade to be assigned. */
                             double cutoff,
                             /** Factor for the non-homologous query check; 0 turns the check off. */
-                            double nh_factor) {
+                            double nh_factor,
+                            /** Distance to the nearest reference leaf that separates member from novel; null: by topology. */
+                            Double distance_threshold) {
     }
 
     /** A tree that gets an error row instead of a result: an input error, or a likely non-homologous query. */
@@ -464,7 +486,7 @@ public final class cladinator {
 
     /** The row(s) for a result: the classification of the query at the cutoff, one row per query name. */
     private static String resultRows(final ResultMulti res, final int counter, final Settings st) {
-        final Classification c = Classification.of(res, st.cutoff());
+        final Classification c = Classification.of(res, st.cutoff(), st.distance_threshold());
         final StringBuilder rows = new StringBuilder();
         for (final String query : queryNames(res.getQueryNamePrefix(), st.split_query())) {
             rows.append(row(counter, query, c, res, st.label()));
@@ -508,6 +530,8 @@ public final class cladinator {
         cells[column("Placement count")] = String.valueOf(res.getNumberOfMatches());
         cells[column("Pendant length")] = (c.getPendantLength() != null) ? LENGTH_FORMAT.format(c.getPendantLength()) : "";
         cells[column("Reference depth")] = (res.getReferenceDepth() != null) ? LENGTH_FORMAT.format(res.getReferenceDepth()) : "";
+        cells[column("Nearest leaf")] = (c.getNearestLeaf() != null) ? label.apply(c.getNearestLeaf()) : "";
+        cells[column("Nearest distance")] = (c.getNearestDistance() != null) ? LENGTH_FORMAT.format(c.getNearestDistance()) : "";
         cells[column("Clade confidences")] = confidences(res.getAllMultiHitPrefixes(), label);
         cells[column("Down-tree confidences")] = confidences(res.getAllMultiHitPrefixesDown(), label);
         cells[column("Up-tree confidences")] = confidences(res.getAllMultiHitPrefixesUp(), label);
@@ -518,11 +542,12 @@ public final class cladinator {
     }
 
     private static String conclusionText(final Classification c, final UnaryOperator<String> label) {
+        final String by_distance = c.isByDistance() ? " (by distance)" : "";
         switch (c.getConclusion()) {
             case MEMBER:
-                return "member of clade " + label.apply(c.getConclusionClade());
+                return "member of clade " + label.apply(c.getConclusionClade()) + by_distance;
             case NOVEL_WITHIN:
-                return "potential for novel sub-species within clade " + label.apply(c.getConclusionClade());
+                return "potential for novel sub-species within clade " + label.apply(c.getConclusionClade()) + by_distance;
             case OUTSIDE_SISTER_TO:
                 return "outside all clades, sister to clade " + label.apply(c.getConclusionClade());
             case OUTSIDE:
@@ -546,6 +571,13 @@ public final class cladinator {
                 l.add(label.apply(p.getPrefix()) + " " + Prefix.CONFIDENCE_FORMAT.format(p.getConfidence()));
             }
             notes.add("sub-clades of " + label.apply(c.getAssignment()) + " tie at the cutoff: " + String.join(", ", l));
+        }
+        if (c.isDistanceNotApplied()) {
+            notes.add("no branch lengths: the distance threshold was not applied");
+        }
+        if (c.getNearestLeafOutsideClade() != null) {
+            notes.add("the nearest reference leaf (" + label.apply(c.getConclusionClade()) + ") is not within the clade of the placements ("
+                    + label.apply(c.getNearestLeafOutsideClade()) + ")");
         }
         if (!c.getSingleLeafSisters().isEmpty()) {
             final List<String> l = new ArrayList<>();
@@ -580,6 +612,8 @@ public final class cladinator {
         System.out.println("  -" + CUTOFF_OPTION + "=<cutoff>        : minimum summed placement confidence for assigning a clade (default: " + CUTOFF_DEFAULT + ")");
         System.out.println("  -" + NON_HOMOLOGOUS_FACTOR_OPTION + "=<factor>       : a query is reported as likely non-homologous when all its placements are at least <factor> times");
         System.out.println("                      as far from the root as the farthest reference leaf (default: " + NON_HOMOLOGOUS_FACTOR_DEFAULT + ", 0 turns the check off)");
+        System.out.println("  -" + DISTANCE_THRESHOLD_OPTION + "=<distance>      : decide member vs. novel by distance: a query closer than <distance> to a reference leaf is a member of");
+        System.out.println("                      that leaf's clade, one farther from every reference leaf is a novel lineage (default: by topology)");
         System.out.println("  -" + QUERY_PATTERN_OPTION + "=<pattern>       : expert option: the regular expression pattern for the query (default: \"" + QUERY_PATTERN_DEFAULT + "\" for pplacer output)");
         System.out.println();
         System.out.println("Examples:");

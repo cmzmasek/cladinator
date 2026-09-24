@@ -3,5 +3,5 @@
 # query pattern: _#\d+_M=(.+)
 # confidence cutoff: 0.7
 # non-homologous query factor: 2.0
-#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Support	Placement count	Pendant length	Reference depth	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
-1	Q16	A	0.9596	n/a	potential for novel sub-species within clade A	0.9596	2	0.1	0.4	A:0.9596;B:0.0404	A.1:0.9596;B.1.1:0.0404	A.2:0.9596;B.2.1:0.0404	placement confidences add up to 0.99 instead of 1, rescaled to 1
+#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Support	Placement count	Pendant length	Reference depth	Nearest leaf	Nearest distance	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
+1	Q16	A	0.9596	n/a	potential for novel sub-species within clade A	0.9596	2	0.1	0.4	A.1.1	0.29596	A:0.9596;B:0.0404	A.1:0.9596;B.1.1:0.0404	A.2:0.9596;B.2.1:0.0404	placement confidences add up to 0.99 instead of 1, rescaled to 1

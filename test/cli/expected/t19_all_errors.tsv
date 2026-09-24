@@ -3,5 +3,5 @@
 # query pattern: _#\d+_M=(.+)
 # confidence cutoff: 0.7
 # non-homologous query factor: 2.0
-#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Support	Placement count	Pendant length	Reference depth	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
-1	QA				Input error: query nodes with different label prefixes found: "QA" and "QB"		2						
+#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Support	Placement count	Pendant length	Reference depth	Nearest leaf	Nearest distance	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
+1	QA				Input error: query nodes with different label prefixes found: "QA" and "QB"		2								
