@@ -30,6 +30,7 @@ import org.forester.phylogeny.factories.PhylogenyFactory;
 import org.forester.util.ForesterUtil;
 
 import java.io.File;
+import java.util.List;
 import java.util.regex.Pattern;
 
 public class CladeAnalysisTest {
@@ -63,6 +64,10 @@ public class CladeAnalysisTest {
             System.out.println("Clade analysis 6 failed");
             failed = true;
         }
+        if (!testCladeAnalysisSeparator()) {
+            System.out.println("Clade analysis separator failed");
+            failed = true;
+        }
         if (!failed) {
             System.out.println("OK");
         } else {
@@ -82,6 +87,9 @@ public class CladeAnalysisTest {
             return false;
         }
         if (!testCladeAnalysis4()) {
+            return false;
+        }
+        if (!testCladeAnalysisSeparator()) {
             return false;
         }
         return true;
@@ -796,5 +804,57 @@ public class CladeAnalysisTest {
         return true;
     }
 
+    // The same tree labeled with "." and with "_" as annotation separator must give the same result.
+    private static boolean testCladeAnalysisSeparator() {
+        try {
+            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
+            final String dot = "((((A.1.1,A.1.2),Q_#1_M=0.6),((A.2.1,A.2.2),Q_#2_M=0.4)),((B.1.1,B.1.2),B.2.1))";
+            final String us = "((((A_1_1,A_1_2),Q_#1_M=0.6),((A_2_1,A_2_2),Q_#2_M=0.4)),((B_1_1,B_1_2),B_2_1))";
+            final ResultMulti res_dot = AnalysisMulti.execute(factory.create(dot, new NHXParser())[0], ".");
+            final ResultMulti res_us = AnalysisMulti.execute(factory.create(us, new NHXParser())[0], "_");
+            if (!res_dot.getAllMultiHitPrefixesDown().get(0).getPrefix().equals("A")) {
+                return false;
+            }
+            if (!res_dot.getAllMultiHitPrefixesUp().get(0).getPrefix().equals("A")) {
+                return false;
+            }
+            if (!samePrefixes(res_dot.getAllMultiHitPrefixes(), res_us.getAllMultiHitPrefixes())) {
+                return false;
+            }
+            if (!samePrefixes(res_dot.getCollapsedMultiHitPrefixes(), res_us.getCollapsedMultiHitPrefixes())) {
+                return false;
+            }
+            if (!samePrefixes(res_dot.getAllMultiHitPrefixesDown(), res_us.getAllMultiHitPrefixesDown())) {
+                return false;
+            }
+            if (!samePrefixes(res_dot.getCollapsedMultiHitPrefixesDown(), res_us.getCollapsedMultiHitPrefixesDown())) {
+                return false;
+            }
+            if (!samePrefixes(res_dot.getAllMultiHitPrefixesUp(), res_us.getAllMultiHitPrefixesUp())) {
+                return false;
+            }
+            if (!samePrefixes(res_dot.getCollapsedMultiHitPrefixesUp(), res_us.getCollapsedMultiHitPrefixesUp())) {
+                return false;
+            }
+        } catch (final Exception e) {
+            e.printStackTrace(System.out);
+            return false;
+        }
+        return true;
+    }
 
+    private static boolean samePrefixes(final List<Prefix> dot, final List<Prefix> us) {
+        if (dot.size() != us.size()) {
+            return false;
+        }
+        for (int i = 0; i < dot.size(); ++i) {
+            if (!dot.get(i).getPrefix().equals(us.get(i).getPrefix().replace('_', '.'))) {
+                return false;
+            }
+            if (!ForesterUtil.isEqual(dot.get(i).getConfidence(), us.get(i).getConfidence())) {
+                return false;
+            }
+        }
+        return true;
+    }
 }

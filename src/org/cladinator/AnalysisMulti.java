@@ -88,7 +88,7 @@ public final class AnalysisMulti {
         }
         cleanUpExternalNames(p, separator);
         final List<PhylogenyNode> qnodes = p.getNodes(query);
-        final ResultMulti res = new ResultMulti();
+        final ResultMulti res = new ResultMulti(separator);
         res.setQueryNamePrefix(obtainQueryPrefix(query, qnodes));
         res.setTotalNumberOfMatches(qnodes.size());
         res.setReferenceTreeNumberOfExternalNodes(p.getNumberOfExternalNodes() - qnodes.size());
