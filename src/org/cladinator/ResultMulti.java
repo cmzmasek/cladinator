@@ -23,8 +23,6 @@ package org.cladinator;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
@@ -276,18 +274,9 @@ public final class ResultMulti {
         return cleaned;
     }
 
+    // Descending confidence; stable, so ties keep their (alphabetical) input order.
     private static void sortPrefixesAccordingToConfidence(final List<Prefix> l) {
-        Collections.sort(l, new Comparator<Prefix>() {
-
-            @Override
-            public int compare(final Prefix x, final Prefix y) {
-                return compare(x.getConfidence(), y.getConfidence());
-            }
-
-            private int compare(final double a, final double b) {
-                return a > b ? -1 : a > b ? 1 : 0;
-            }
-        });
+        l.sort((x, y) -> Double.compare(y.getConfidence(), x.getConfidence()));
     }
 
     private static List<Prefix> obtainAllPrefixes(final List<Prefix> greatest_common_prefixes,

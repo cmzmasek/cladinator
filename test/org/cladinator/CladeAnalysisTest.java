@@ -68,6 +68,10 @@ public class CladeAnalysisTest {
             System.out.println("Clade analysis separator failed");
             failed = true;
         }
+        if (!testCladeAnalysisManyPrefixes()) {
+            System.out.println("Clade analysis many prefixes failed");
+            failed = true;
+        }
         if (!failed) {
             System.out.println("OK");
         } else {
@@ -90,6 +94,9 @@ public class CladeAnalysisTest {
             return false;
         }
         if (!testCladeAnalysisSeparator()) {
+            return false;
+        }
+        if (!testCladeAnalysisManyPrefixes()) {
             return false;
         }
         return true;
@@ -835,6 +842,55 @@ public class CladeAnalysisTest {
             }
             if (!samePrefixes(res_dot.getCollapsedMultiHitPrefixesUp(), res_us.getCollapsedMultiHitPrefixesUp())) {
                 return false;
+            }
+        } catch (final Exception e) {
+            e.printStackTrace(System.out);
+            return false;
+        }
+        return true;
+    }
+
+    // Placements next to 40 clades give 40+ prefixes; lists must come out sorted by descending confidence
+    // (the sort misbehaved from 32 elements on).
+    private static boolean testCladeAnalysisManyPrefixes() {
+        try {
+            final int n = 40;
+            final double total = n * (n + 1) / 2.0;
+            final StringBuilder sb = new StringBuilder("(");
+            for (int k = 1; k <= n; ++k) {
+                if (k > 1) {
+                    sb.append(",");
+                }
+                sb.append("(((X").append(k).append(".1.1,X").append(k).append(".1.2),Q_#").append(k)
+                        .append("_M=").append(k / total).append("),(X").append(k).append(".2.1,X").append(k)
+                        .append(".2.2))");
+            }
+            sb.append(")");
+            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
+            final ResultMulti res = AnalysisMulti.execute(factory.create(sb.toString(), new NHXParser())[0], ".");
+            if (res.getAllMultiHitPrefixes().size() != n) {
+                return false;
+            }
+            if (!res.getAllMultiHitPrefixes().get(0).getPrefix().equals("X" + n)) {
+                return false;
+            }
+            if (!res.getAllMultiHitPrefixesDown().get(0).getPrefix().equals("X" + n + ".1")) {
+                return false;
+            }
+            if (!res.getAllMultiHitPrefixesUp().get(0).getPrefix().equals("X" + n + ".2")) {
+                return false;
+            }
+            for (final List<Prefix> l : List.of(res.getAllMultiHitPrefixes(),
+                    res.getCollapsedMultiHitPrefixes(),
+                    res.getAllMultiHitPrefixesDown(),
+                    res.getCollapsedMultiHitPrefixesDown(),
+                    res.getAllMultiHitPrefixesUp(),
+                    res.getCollapsedMultiHitPrefixesUp())) {
+                for (int i = 1; i < l.size(); ++i) {
+                    if (l.get(i).getConfidence() > l.get(i - 1).getConfidence()) {
+                        return false;
+                    }
+                }
             }
         } catch (final Exception e) {
             e.printStackTrace(System.out);
