@@ -60,6 +60,7 @@ Options:
 | `-sq` | split query names at `_` and print one row per part (e.g. `S1_S2` gives rows for `S1` and `S2`) |
 | `-c=<cutoff>` | minimum summed placement confidence for assigning a clade (default: 0.7) |
 | `-nh=<factor>` | a query is reported as likely non-homologous when all its placements are at least `<factor>` times as far from the root as the farthest reference leaf (default: 2, `0` turns the check off) |
+| `-d=<distance>` | decide member vs. novel by distance: a query closer than `<distance>` to a reference leaf is a member of that leaf's clade, one farther from every reference leaf is a novel lineage (default: by topology; see below) |
 | `-q=<pattern>` | expert option: regular expression for query names (default: `_#\d+_M=(.+)`) |
 
 Examples:
@@ -99,6 +100,8 @@ column names, then one row per query and tree:
 | `Placement count` | number of placements of the query in the tree |
 | `Pendant length` | the query's branch length, averaged over the placements by confidence (empty without branch lengths) |
 | `Reference depth` | distance from the root to the farthest reference leaf (empty without branch lengths) |
+| `Nearest leaf` | the reference leaf closest to the query by path length (of the placement with the highest confidence) |
+| `Nearest distance` | the path length from the query to its nearest reference leaf, averaged over the placements by confidence (empty without branch lengths) |
 | `Clade confidences` | every clade prefix with its summed confidence, e.g. `A:1.0;A.1:0.9;A.2:0.1`; the basis of the assignment |
 | `Down-tree confidences` | the same for the down-tree bracketing clades (the query's sister clades) |
 | `Up-tree confidences` | the same for the up-tree bracketing clades |
@@ -144,13 +147,37 @@ Otherwise:
 - `no confident assignment (best match: clade X 0.6)`, or with a tie
   `no confident assignment (tie: clade A 0.5, clade B 0.5)`
 
+### Member or novel by distance (`-d`)
+
+A query that belongs to the taxon of a single reference leaf is placed sister
+to that leaf, exactly like a novel lineage would be: the topology cannot
+tell the two apart (the row then notes `sister to a single reference leaf
+(A.1.1: 0.9): membership in A.1.1 cannot be excluded`). Branch lengths can.
+With `-d=<distance>`, a demarcation distance in the units of the tree
+(usually substitutions per site), the distance from the query to its nearest
+reference leaf decides:
+
+- placements closer than the distance to a reference leaf support
+  `member of clade L (by distance)`, where `L` is that leaf's label (leaves
+  that tie count for their common clade); if this reaches the cutoff, `L`
+  becomes the assignment, so that a clade represented by a single leaf can
+  be assigned;
+- placements farther than the distance from every reference leaf support
+  `potential for novel sub-species within clade X (by distance)`, where `X`
+  is the clade of the placements from the topology.
+
+The conclusion is the one with more confidence, reported in `Support`. A
+query nested among leaves of one label but on a long branch is thus novel
+by distance, and one sister to a single leaf but close to it is a member.
+Without branch lengths the option has no effect and the row says so.
+
 Notes in `Warnings`:
 
 - `sister to a single reference leaf (A.1.1: 0.9): membership in A.1.1 cannot
-  be excluded`: a query that belongs to the taxon of a single reference leaf
-  is placed sister to that leaf, exactly like a novel lineage would be; the
-  topology cannot tell the two apart. `Pendant length` compared with
-  `Reference depth` can: a member has a short pendant branch.
+  be excluded` (see above; not shown with `-d`)
+- `no branch lengths: the distance threshold was not applied`
+- `the nearest reference leaf (B.1) is not within the clade of the
+  placements (A)`: the labels and the tree disagree
 - `sub-clades of A tie at the cutoff: A.1 0.5, A.2 0.5`
 - `the root has 3 children (unrooted tree?): the up-tree brackets depend on
   the root`
@@ -184,6 +211,12 @@ java -cp dist/cladinator.jar org.cladinator.cladinator_tree_prepare <in-tree> <o
 ```
 
 ## Changes
+
+**3.3.0** (2026-09-24)
+
+- New option `-d=<distance>`: member vs. novel decided by the distance to
+  the nearest reference leaf (a clade represented by a single leaf can then
+  be assigned). New columns `Nearest leaf` and `Nearest distance`.
 
 **3.2.0** (2026-09-24)
 
