@@ -62,6 +62,8 @@ public final class cladinator {
     final static private String EXTRA_PROCESSING1_KEEP_EXTRA_OPTION = "xk";
     final static private String SPECIAL_PROCESSING_OPTION = "S";
     final static private String REMOVE_ANNOT_SEP_OPTION = "rs";
+    final static private String SPLIT_QUERY_OPTION = "sq";
+    final static private String QUERY_NAME_SPLIT_SEP = "_";
     final static private String SEP_DEFAULT = ".";
     final static private Pattern QUERY_PATTERN_DEFAULT = AnalysisMulti.DEFAULT_QUERY_PATTERN_FOR_PPLACER_TYPE;
     final static private String EXTRA_PROCESSING1_SEP_DEFAULT = "|";
@@ -97,6 +99,7 @@ public final class cladinator {
             allowed_options.add(EXTRA_PROCESSING1_KEEP_EXTRA_OPTION);
             allowed_options.add(SPECIAL_PROCESSING_OPTION);
             allowed_options.add(REMOVE_ANNOT_SEP_OPTION);
+            allowed_options.add(SPLIT_QUERY_OPTION);
             final String dissallowed_options = cla.validateAllowedOptionsAsString(allowed_options);
             if (dissallowed_options.length() > 0) {
                 ForesterUtil.fatalError(PRG_NAME, "unknown option(s): " + dissallowed_options);
@@ -211,12 +214,8 @@ public final class cladinator {
                     ForesterUtil.fatalError(PRG_NAME, "no value for special processing pattern");
                 }
             }
-            final boolean remove_annotation_sep;
-            if (cla.isOptionSet(REMOVE_ANNOT_SEP_OPTION)) {
-                remove_annotation_sep = true;
-            } else {
-                remove_annotation_sep = false;
-            }
+            final boolean remove_annotation_sep = cla.isOptionSet(REMOVE_ANNOT_SEP_OPTION);
+            final boolean split_query = cla.isOptionSet(SPLIT_QUERY_OPTION);
 
 
             final String sep = separator;
@@ -229,6 +228,9 @@ public final class cladinator {
             System.out.println("Annotation-separator       : " + separator);
             if (remove_annotation_sep) {
                 System.out.println("Remove anno.-sep. in output: " + remove_annotation_sep);
+            }
+            if (split_query) {
+                System.out.println("Split query names at \"" + QUERY_NAME_SPLIT_SEP + "\": " + split_query);
             }
             System.out.println("Query pattern              : " + pattern);
             if (extra_processing1) {
@@ -279,17 +281,17 @@ public final class cladinator {
                 ++counter;
                 try {
                     analyzeTree(phy, counter, pattern, separator, map, extra_processing1, extra_processing1_sep,
-                            extra_processing1_keep, special_processing, special_pattern, label, outtable_writer,
-                            print_writer);
+                            extra_processing1_keep, special_processing, special_pattern, label, split_query,
+                            outtable_writer, print_writer);
                 } catch (final UserException e) {
                     // A problem with this tree only: report it in its row and go on with the next tree.
                     final String message = "Input error: " + e.getMessage();
                     final String q = queryNamePrefix(phy, pattern);
                     final int placements = numberOfQueryNodes(phy, pattern);
                     if (outtable_writer != null) {
-                        inputErrorRow(counter, q, message, placements, outtable_writer);
+                        inputErrorRows(counter, q, split_query, message, placements, outtable_writer);
                     }
-                    inputErrorRow(counter, q, message, placements, print_writer);
+                    inputErrorRows(counter, q, split_query, message, placements, print_writer);
                 }
                 print_writer.flush();
             }
@@ -318,6 +320,7 @@ public final class cladinator {
                                     final boolean special_processing,
                                     final Pattern special_pattern,
                                     final UnaryOperator<String> label,
+                                    final boolean split_query,
                                     final EasyWriter outtable_writer,
                                     final BufferedWriter print_writer) throws UserException, IOException {
         if (map != null) {
@@ -333,37 +336,38 @@ public final class cladinator {
         if ((query_nodes == null) || query_nodes.isEmpty()) {
             final String message = "Input error: no query found (query pattern: " + pattern + ")";
             if (outtable_writer != null) {
-                inputErrorRow(counter, "", message, 0, outtable_writer);
+                inputErrorRows(counter, "", split_query, message, 0, outtable_writer);
             }
-            inputErrorRow(counter, "", message, 0, print_writer);
+            inputErrorRows(counter, "", split_query, message, 0, print_writer);
             return;
         }
 
         if (AnalysisMulti.likelyProblematicQuery(phy, pattern, 2)) {
-            int placements = 0;
-            String q = "";
-            try {
-                final List<PhylogenyNode> nodes = phy.getNodes(pattern);
-                if (nodes != null && nodes.size() > 0) {
-                    placements = nodes.size();
-                    q = nodes.get(0).getName().split("_")[0];
-                }
-            } catch (final Exception e) {
-                // Eat exception
-            }
+            final String q = queryNamePrefix(phy, pattern);
             if (outtable_writer != null) {
-                inputErrorRow(counter, q, NON_HOMOLOGOUS_QUERY_MESSAGE, placements, outtable_writer);
+                inputErrorRows(counter, q, split_query, NON_HOMOLOGOUS_QUERY_MESSAGE, query_nodes.size(), outtable_writer);
             }
-            inputErrorRow(counter, q, NON_HOMOLOGOUS_QUERY_MESSAGE, placements, print_writer);
+            inputErrorRows(counter, q, split_query, NON_HOMOLOGOUS_QUERY_MESSAGE, query_nodes.size(), print_writer);
             return;
         }
 
         final ResultMulti res = AnalysisMulti.execute(phy, pattern, separator);
 
         if (outtable_writer != null) {
-            printResult(res, counter, pattern, label, outtable_writer);
+            printResult(res, counter, pattern, label, split_query, outtable_writer);
         }
-        printResult(res, counter, pattern, label, print_writer);
+        printResult(res, counter, pattern, label, split_query, print_writer);
+    }
+
+    /** The names to print for a query: the name itself, or with -sq its "_"-separated parts, one row each. */
+    private static String[] queryNames(final String query_name, final boolean split_query) {
+        return split_query ? query_name.split(QUERY_NAME_SPLIT_SEP) : new String[]{query_name};
+    }
+
+    private static void inputErrorRows(final int counter, final String query_name, final boolean split_query, final String message, final int placements, final BufferedWriter w) throws IOException {
+        for (final String query : queryNames(query_name, split_query)) {
+            inputErrorRow(counter, query, message, placements, w);
+        }
     }
 
     /** The query name, i.e. the part of the first query node's name before the query pattern; "" if none. */
@@ -402,12 +406,11 @@ public final class cladinator {
         w.flush();
     }
 
-    private final static void printResult(final ResultMulti res, final int counter, final Pattern pattern, final UnaryOperator<String> label, final BufferedWriter w) throws IOException {
+    private final static void printResult(final ResultMulti res, final int counter, final Pattern pattern, final UnaryOperator<String> label, final boolean split_query, final BufferedWriter w) throws IOException {
         if ((res.getAllMultiHitPrefixes() == null) || (res.getAllMultiHitPrefixes().size() < 1)) {
             w.flush();
             ForesterUtil.fatalError(PRG_NAME, "ERROR: No match to query pattern \"" + pattern + "\" in tree #" + counter);
         }
-        final boolean split_query = true;
         final double cutoff = 0.7;
         boolean done = false;
 
@@ -420,7 +423,7 @@ public final class cladinator {
         for (final Prefix prefix : res.getCollapsedMultiHitPrefixes()) {
             if ((prefix.getConfidence() >= cutoff) && !prefix.getPrefix().equals(AnalysisMulti.UNKNOWN)) {
                 if (split_query) {
-                    final String[] queries = res.getQueryNamePrefix().split("_");
+                    final String[] queries = queryNames(res.getQueryNamePrefix(), split_query);
                     for (final String query : queries) {
                         printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res.getWarnings(), w);
                     }
@@ -436,7 +439,7 @@ public final class cladinator {
                 for (final Prefix prefix : res.getCollapsedMultiHitPrefixesDown()) {
                     if ((prefix.getConfidence() >= cutoff) && !prefix.getPrefix().equals(AnalysisMulti.UNKNOWN)) {
                         if (split_query) {
-                            final String[] queries = res.getQueryNamePrefix().split("_");
+                            final String[] queries = queryNames(res.getQueryNamePrefix(), split_query);
                             for (final String query : queries) {
                                 printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res.getWarnings(), w);
                             }
@@ -454,7 +457,7 @@ public final class cladinator {
                 for (final Prefix prefix : res.getCollapsedMultiHitPrefixesUp()) {
                     if ((prefix.getConfidence() >= cutoff) && !prefix.getPrefix().equals(AnalysisMulti.UNKNOWN)) {
                         if (split_query) {
-                            final String[] queries = res.getQueryNamePrefix().split("_");
+                            final String[] queries = queryNames(res.getQueryNamePrefix(), split_query);
                             for (final String query : queries) {
                                 printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res.getWarnings(), w);
                             }
@@ -469,7 +472,7 @@ public final class cladinator {
         }
         if (!done) {
             if (split_query) {
-                final String[] queries = res.getQueryNamePrefix().split("_");
+                final String[] queries = queryNames(res.getQueryNamePrefix(), split_query);
                 for (final String query : queries) {
 
                     final Prefix r = res.getAllMultiHitPrefixes().get(0);
@@ -560,6 +563,7 @@ public final class cladinator {
         System.out.println("  -" + EXTRA_PROCESSING1_KEEP_EXTRA_OPTION + "                : to keep extra annotations (e.g. \"Q16611|A.1.1\" becomes \"A.1.1.Q16611\")");
         System.out.println("  -" + SPECIAL_PROCESSING_OPTION + "=<pattern>       : special processing with pattern (e.g. \"(\\d+)([a-z]+)_.+\" for changing \"6q_EF42\" to \"6.q\")");
         System.out.println("  -" + REMOVE_ANNOT_SEP_OPTION + "                : to remove the annotation-separator in the output (e.g. the \"" + SEP_DEFAULT + "\")");
+        System.out.println("  -" + SPLIT_QUERY_OPTION + "                : to split query names at \"" + QUERY_NAME_SPLIT_SEP + "\" and print one row per part (e.g. \"S1_S2\" gives rows for S1 and S2)");
         System.out.println("  --" + QUERY_PATTERN_OPTION + "=<pattern>      : expert option: the regular expression pattern for the query (default: \"" + QUERY_PATTERN_DEFAULT + "\" for pplacer output)");
         System.out.println();
         System.out.println("Examples:");

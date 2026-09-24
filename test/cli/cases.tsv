@@ -17,3 +17,6 @@ t03_root_placement_rs	t03_root_placement.nwk	-rs
 t15_no_branch_lengths	t15_no_branch_lengths.nwk	
 t16_rescaled	t16_rescaled.nwk	
 t17_two_queries_then_ok	t17_two_queries_then_ok.nwk	
+t08_underscore_query_sq	t08_underscore_query.nwk	-sq
+t18_underscore_error	t18_underscore_error.nwk	
+t18_underscore_error_sq	t18_underscore_error.nwk	-sq
