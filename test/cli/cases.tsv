@@ -20,3 +20,5 @@ t17_two_queries_then_ok	t17_two_queries_then_ok.nwk
 t08_underscore_query_sq	t08_underscore_query.nwk	-sq
 t18_underscore_error	t18_underscore_error.nwk	
 t18_underscore_error_sq	t18_underscore_error.nwk	-sq
+t13_split_a_b_c05	t13_split_a_b.nwk	-c=0.5
+t09_long_branch_nh0	t09_long_branch.nwk	-nh=0

@@ -63,6 +63,10 @@ public final class cladinator {
     final static private String SPECIAL_PROCESSING_OPTION = "S";
     final static private String REMOVE_ANNOT_SEP_OPTION = "rs";
     final static private String SPLIT_QUERY_OPTION = "sq";
+    final static private String CUTOFF_OPTION = "c";
+    final static private String NON_HOMOLOGOUS_FACTOR_OPTION = "nh";
+    final static private double CUTOFF_DEFAULT = 0.7;
+    final static private double NON_HOMOLOGOUS_FACTOR_DEFAULT = 2.0;
     final static private String QUERY_NAME_SPLIT_SEP = "_";
     final static private String SEP_DEFAULT = ".";
     final static private Pattern QUERY_PATTERN_DEFAULT = AnalysisMulti.DEFAULT_QUERY_PATTERN_FOR_PPLACER_TYPE;
@@ -100,6 +104,8 @@ public final class cladinator {
             allowed_options.add(SPECIAL_PROCESSING_OPTION);
             allowed_options.add(REMOVE_ANNOT_SEP_OPTION);
             allowed_options.add(SPLIT_QUERY_OPTION);
+            allowed_options.add(CUTOFF_OPTION);
+            allowed_options.add(NON_HOMOLOGOUS_FACTOR_OPTION);
             final String dissallowed_options = cla.validateAllowedOptionsAsString(allowed_options);
             if (dissallowed_options.length() > 0) {
                 ForesterUtil.fatalError(PRG_NAME, "unknown option(s): " + dissallowed_options);
@@ -216,10 +222,31 @@ public final class cladinator {
             }
             final boolean remove_annotation_sep = cla.isOptionSet(REMOVE_ANNOT_SEP_OPTION);
             final boolean split_query = cla.isOptionSet(SPLIT_QUERY_OPTION);
-
+            double cutoff = CUTOFF_DEFAULT;
+            if (cla.isOptionSet(CUTOFF_OPTION)) {
+                if (!cla.isOptionValueSet(CUTOFF_OPTION)) {
+                    ForesterUtil.fatalError(PRG_NAME, "no value for confidence cutoff");
+                }
+                cutoff = cla.getOptionValueAsDouble(CUTOFF_OPTION);
+                if ((cutoff <= 0) || (cutoff > 1)) {
+                    ForesterUtil.fatalError(PRG_NAME, "confidence cutoff must be greater than 0 and at most 1");
+                }
+            }
+            double nh_factor = NON_HOMOLOGOUS_FACTOR_DEFAULT;
+            if (cla.isOptionSet(NON_HOMOLOGOUS_FACTOR_OPTION)) {
+                if (!cla.isOptionValueSet(NON_HOMOLOGOUS_FACTOR_OPTION)) {
+                    ForesterUtil.fatalError(PRG_NAME, "no value for non-homologous query factor");
+                }
+                nh_factor = cla.getOptionValueAsDouble(NON_HOMOLOGOUS_FACTOR_OPTION);
+                if (nh_factor < 0) {
+                    ForesterUtil.fatalError(PRG_NAME, "non-homologous query factor must not be negative (0 turns the check off)");
+                }
+            }
 
             final String sep = separator;
             final UnaryOperator<String> label = remove_annotation_sep ? (name -> name.replace(sep, "")) : (name -> name);
+            final Settings settings = new Settings(pattern, separator, map, extra_processing1, extra_processing1_sep,
+                    extra_processing1_keep, special_processing, special_pattern, label, split_query, cutoff, nh_factor);
 
             System.out.println("Input tree                 : " + intreefile);
             if (mapping_file != null) {
@@ -241,6 +268,12 @@ public final class cladinator {
             if (special_processing) {
                 System.out.println("Special processing         : " + special_processing);
                 System.out.println("Special processing pattern : " + special_pattern);
+            }
+            System.out.println("Confidence cutoff          : " + cutoff);
+            if (nh_factor > 0) {
+                System.out.println("Non-homologous query factor: " + nh_factor);
+            } else {
+                System.out.println("Non-homologous query check : off");
             }
             if (outtablefile != null) {
                 System.out.println("Output table               : " + outtablefile);
@@ -273,25 +306,45 @@ public final class cladinator {
             System.out.println();
             System.out.println("Results:");
             System.out.println();
-            if (outtable_writer != null) {
-                describeColumns(outtable_writer);
+            final List<String> header = new ArrayList<>();
+            header.add("# " + PRG_NAME + " " + PRG_VERSION + " (" + PRG_DATE + ")");
+            header.add("# input trees: " + intreefile);
+            if (mapping_file != null) {
+                header.add("# mapping file: " + mapping_file);
             }
-            describeColumns(print_writer);
+            header.add("# annotation separator: " + separator);
+            header.add("# query pattern: " + pattern);
+            header.add("# confidence cutoff: " + cutoff);
+            header.add("# non-homologous query factor: " + (nh_factor > 0 ? String.valueOf(nh_factor) : "off"));
+            if (extra_processing1) {
+                header.add("# extra processing: separator \"" + extra_processing1_sep + "\", keep extra: " + extra_processing1_keep);
+            }
+            if (special_processing) {
+                header.add("# special processing pattern: " + special_pattern);
+            }
+            if (remove_annotation_sep) {
+                header.add("# annotation separator removed from clade names in this table");
+            }
+            if (split_query) {
+                header.add("# query names split at \"" + QUERY_NAME_SPLIT_SEP + "\"");
+            }
+            if (outtable_writer != null) {
+                writeHeader(header, outtable_writer);
+            }
+            writeHeader(header, print_writer);
             for (final Phylogeny phy : phys) {
                 ++counter;
                 try {
-                    analyzeTree(phy, counter, pattern, separator, map, extra_processing1, extra_processing1_sep,
-                            extra_processing1_keep, special_processing, special_pattern, label, split_query,
-                            outtable_writer, print_writer);
+                    analyzeTree(phy, counter, settings, outtable_writer, print_writer);
                 } catch (final UserException e) {
                     // A problem with this tree only: report it in its row and go on with the next tree.
                     final String message = "Input error: " + e.getMessage();
                     final String q = queryNamePrefix(phy, pattern);
                     final int placements = numberOfQueryNodes(phy, pattern);
                     if (outtable_writer != null) {
-                        inputErrorRows(counter, q, split_query, message, placements, outtable_writer);
+                        inputErrorRows(counter, q, settings.split_query, message, placements, outtable_writer);
                     }
-                    inputErrorRows(counter, q, split_query, message, placements, print_writer);
+                    inputErrorRows(counter, q, settings.split_query, message, placements, print_writer);
                 }
                 print_writer.flush();
             }
@@ -309,20 +362,58 @@ public final class cladinator {
         }
     }
 
+    /** The settings of a run that the per-tree analysis and the output need. */
+    private static final class Settings {
+        final Pattern pattern;
+        final String separator;
+        final SortedMap<String, String> map;
+        final boolean extra_processing1;
+        final String extra_processing1_sep;
+        final boolean extra_processing1_keep;
+        final boolean special_processing;
+        final Pattern special_pattern;
+        /** How clade names are printed (identity, or with -rs without the separator). */
+        final UnaryOperator<String> label;
+        final boolean split_query;
+        /** Minimum summed placement confidence for a clade to be assigned. */
+        final double cutoff;
+        /** Factor for the non-homologous query check; 0 turns the check off. */
+        final double nh_factor;
+
+        Settings(final Pattern pattern, final String separator, final SortedMap<String, String> map,
+                 final boolean extra_processing1, final String extra_processing1_sep, final boolean extra_processing1_keep,
+                 final boolean special_processing, final Pattern special_pattern, final UnaryOperator<String> label,
+                 final boolean split_query, final double cutoff, final double nh_factor) {
+            this.pattern = pattern;
+            this.separator = separator;
+            this.map = map;
+            this.extra_processing1 = extra_processing1;
+            this.extra_processing1_sep = extra_processing1_sep;
+            this.extra_processing1_keep = extra_processing1_keep;
+            this.special_processing = special_processing;
+            this.special_pattern = special_pattern;
+            this.label = label;
+            this.split_query = split_query;
+            this.cutoff = cutoff;
+            this.nh_factor = nh_factor;
+        }
+    }
+
     private static void analyzeTree(final Phylogeny phy,
                                     final int counter,
-                                    final Pattern pattern,
-                                    final String separator,
-                                    final SortedMap<String, String> map,
-                                    final boolean extra_processing1,
-                                    final String extra_processing1_sep,
-                                    final boolean extra_processing1_keep,
-                                    final boolean special_processing,
-                                    final Pattern special_pattern,
-                                    final UnaryOperator<String> label,
-                                    final boolean split_query,
+                                    final Settings st,
                                     final EasyWriter outtable_writer,
                                     final BufferedWriter print_writer) throws UserException, IOException {
+        final Pattern pattern = st.pattern;
+        final String separator = st.separator;
+        final SortedMap<String, String> map = st.map;
+        final boolean extra_processing1 = st.extra_processing1;
+        final String extra_processing1_sep = st.extra_processing1_sep;
+        final boolean extra_processing1_keep = st.extra_processing1_keep;
+        final boolean special_processing = st.special_processing;
+        final Pattern special_pattern = st.special_pattern;
+        final UnaryOperator<String> label = st.label;
+        final boolean split_query = st.split_query;
         if (map != null) {
             AnalysisMulti.performMapping(pattern, map, phy, true);
         }
@@ -342,7 +433,7 @@ public final class cladinator {
             return;
         }
 
-        if (AnalysisMulti.likelyProblematicQuery(phy, pattern, 2)) {
+        if ((st.nh_factor > 0) && AnalysisMulti.likelyProblematicQuery(phy, pattern, st.nh_factor)) {
             final String q = queryNamePrefix(phy, pattern);
             if (outtable_writer != null) {
                 inputErrorRows(counter, q, split_query, NON_HOMOLOGOUS_QUERY_MESSAGE, query_nodes.size(), outtable_writer);
@@ -354,9 +445,9 @@ public final class cladinator {
         final ResultMulti res = AnalysisMulti.execute(phy, pattern, separator);
 
         if (outtable_writer != null) {
-            printResult(res, counter, pattern, label, split_query, outtable_writer);
+            printResult(res, counter, pattern, label, split_query, st.cutoff, outtable_writer);
         }
-        printResult(res, counter, pattern, label, split_query, print_writer);
+        printResult(res, counter, pattern, label, split_query, st.cutoff, print_writer);
     }
 
     /** The names to print for a query: the name itself, or with -sq its "_"-separated parts, one row each. */
@@ -400,18 +491,16 @@ public final class cladinator {
         w.write(message);
         w.write("\t");
         w.write(String.valueOf(placements));
-        w.write("\t");
-        w.write("");
+        w.write("\t\t\t\t");
         w.write("\n");
         w.flush();
     }
 
-    private final static void printResult(final ResultMulti res, final int counter, final Pattern pattern, final UnaryOperator<String> label, final boolean split_query, final BufferedWriter w) throws IOException {
+    private final static void printResult(final ResultMulti res, final int counter, final Pattern pattern, final UnaryOperator<String> label, final boolean split_query, final double cutoff, final BufferedWriter w) throws IOException {
         if ((res.getAllMultiHitPrefixes() == null) || (res.getAllMultiHitPrefixes().size() < 1)) {
             w.flush();
             ForesterUtil.fatalError(PRG_NAME, "ERROR: No match to query pattern \"" + pattern + "\" in tree #" + counter);
         }
-        final double cutoff = 0.7;
         boolean done = false;
 
         //System.out.println("UP:");
@@ -425,10 +514,10 @@ public final class cladinator {
                 if (split_query) {
                     final String[] queries = queryNames(res.getQueryNamePrefix(), split_query);
                     for (final String query : queries) {
-                        printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res.getWarnings(), w);
+                        printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res, w);
                     }
                 } else {
-                    printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res.getWarnings(), w);
+                    printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res, w);
                 }
                 done = true;
                 break;
@@ -441,10 +530,10 @@ public final class cladinator {
                         if (split_query) {
                             final String[] queries = queryNames(res.getQueryNamePrefix(), split_query);
                             for (final String query : queries) {
-                                printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res.getWarnings(), w);
+                                printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res, w);
                             }
                         } else {
-                            printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res.getWarnings(), w);
+                            printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res, w);
                         }
                         done = true;
                         break;
@@ -459,10 +548,10 @@ public final class cladinator {
                         if (split_query) {
                             final String[] queries = queryNames(res.getQueryNamePrefix(), split_query);
                             for (final String query : queries) {
-                                printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res.getWarnings(), w);
+                                printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res, w);
                             }
                         } else {
-                            printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res.getWarnings(), w);
+                            printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res, w);
                         }
                         done = true;
                         break;
@@ -477,22 +566,38 @@ public final class cladinator {
 
                     final Prefix r = res.getAllMultiHitPrefixes().get(0);
 
-                    printRow(counter, query, r.getPrefix(), r.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, res.getNumberOfMatches(), false, label, res.getWarnings(), w);
+                    printRow(counter, query, r.getPrefix(), r.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, res.getNumberOfMatches(), false, label, res, w);
                 }
             } else {
                 final Prefix r = res.getAllMultiHitPrefixes().get(0);
-                printRow(counter, res.getQueryNamePrefix(), r.getPrefix(), r.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, res.getNumberOfMatches(), false, label, res.getWarnings(), w);
+                printRow(counter, res.getQueryNamePrefix(), r.getPrefix(), r.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, res.getNumberOfMatches(), false, label, res, w);
             }
         }
         w.flush();
     }
 
-    private static void describeColumns(BufferedWriter w) throws IOException {
-        w.write("#Tree #\tQuery\tAssignment\tConfidence\tBrackets\tConclusion\tPlacement count\tWarnings");
+    private static void writeHeader(final List<String> parameter_lines, final BufferedWriter w) throws IOException {
+        for (final String line : parameter_lines) {
+            w.write(line);
+            w.write("\n");
+        }
+        w.write("#Tree #\tQuery\tAssignment\tConfidence\tBrackets\tConclusion\tPlacement count\tClade confidences\tDown-tree confidences\tUp-tree confidences\tWarnings");
         w.write("\n");
     }
 
-    private static void printRow(final int counter, final String query, final String match, final double confidence, final String prefix_down, final String prefix_up, final int placements, final boolean confident, final UnaryOperator<String> label, final List<String> warnings, final BufferedWriter w) throws IOException {
+    /** All prefixes of a list with their confidences, e.g. "A:1.0;A.1:0.9;A.2:0.1". */
+    private static String confidences(final List<Prefix> prefixes, final UnaryOperator<String> label) {
+        final StringBuilder sb = new StringBuilder();
+        for (final Prefix p : prefixes) {
+            if (sb.length() > 0) {
+                sb.append(";");
+            }
+            sb.append(label.apply(p.getPrefix())).append(":").append(df.format(p.getConfidence()));
+        }
+        return sb.toString();
+    }
+
+    private static void printRow(final int counter, final String query, final String match, final double confidence, final String prefix_down, final String prefix_up, final int placements, final boolean confident, final UnaryOperator<String> label, final ResultMulti res, final BufferedWriter w) throws IOException {
         final String m = label.apply(match);
         final String d = label.apply(prefix_down);
         final String u = label.apply(prefix_up);
@@ -544,7 +649,13 @@ public final class cladinator {
         w.write("\t");
         w.write(String.valueOf(placements));
         w.write("\t");
-        w.write(String.join("; ", warnings));
+        w.write(confidences(res.getAllMultiHitPrefixes(), label));
+        w.write("\t");
+        w.write(confidences(res.getAllMultiHitPrefixesDown(), label));
+        w.write("\t");
+        w.write(confidences(res.getAllMultiHitPrefixesUp(), label));
+        w.write("\t");
+        w.write(String.join("; ", res.getWarnings()));
         w.write("\n");
         w.flush();
     }
@@ -564,7 +675,10 @@ public final class cladinator {
         System.out.println("  -" + SPECIAL_PROCESSING_OPTION + "=<pattern>       : special processing with pattern (e.g. \"(\\d+)([a-z]+)_.+\" for changing \"6q_EF42\" to \"6.q\")");
         System.out.println("  -" + REMOVE_ANNOT_SEP_OPTION + "                : to remove the annotation-separator in the output (e.g. the \"" + SEP_DEFAULT + "\")");
         System.out.println("  -" + SPLIT_QUERY_OPTION + "                : to split query names at \"" + QUERY_NAME_SPLIT_SEP + "\" and print one row per part (e.g. \"S1_S2\" gives rows for S1 and S2)");
-        System.out.println("  --" + QUERY_PATTERN_OPTION + "=<pattern>      : expert option: the regular expression pattern for the query (default: \"" + QUERY_PATTERN_DEFAULT + "\" for pplacer output)");
+        System.out.println("  -" + CUTOFF_OPTION + "=<cutoff>        : minimum summed placement confidence for assigning a clade (default: " + CUTOFF_DEFAULT + ")");
+        System.out.println("  -" + NON_HOMOLOGOUS_FACTOR_OPTION + "=<factor>       : a query is reported as likely non-homologous when all its placements are at least <factor> times");
+        System.out.println("                      as far from the root as the farthest reference leaf (default: " + NON_HOMOLOGOUS_FACTOR_DEFAULT + ", 0 turns the check off)");
+        System.out.println("  -" + QUERY_PATTERN_OPTION + "=<pattern>       : expert option: the regular expression pattern for the query (default: \"" + QUERY_PATTERN_DEFAULT + "\" for pplacer output)");
         System.out.println();
         System.out.println("Examples:");
         System.out.println();

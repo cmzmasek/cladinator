@@ -1,3 +1,8 @@
-#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Placement count	Warnings
-1					Input error: no query found (query pattern: _#\d+_M=(.+))	0	
-2	Q1	A	1.0	[A.1, A.2]	potential for novel sub-species within clade A	1	
+# input trees: test/data/t07_nomatch_then_ok.nwk
+# annotation separator: .
+# query pattern: _#\d+_M=(.+)
+# confidence cutoff: 0.7
+# non-homologous query factor: 2.0
+#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Placement count	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
+1					Input error: no query found (query pattern: _#\d+_M=(.+))	0				
+2	Q1	A	1.0	[A.1, A.2]	potential for novel sub-species within clade A	1	A:1.0	A.1:1.0	A.2:1.0	

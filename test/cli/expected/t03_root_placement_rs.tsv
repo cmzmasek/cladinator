@@ -1,2 +1,8 @@
-#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Placement count	Warnings
-1	Q3	A1	0.7	n/a	potential for novel sub-species within clade A1	2	
+# input trees: test/data/t03_root_placement.nwk
+# annotation separator: .
+# query pattern: _#\d+_M=(.+)
+# confidence cutoff: 0.7
+# non-homologous query factor: 2.0
+# annotation separator removed from clade names in this table
+#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Placement count	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
+1	Q3	A1	0.7	n/a	potential for novel sub-species within clade A1	2	A1:0.7;?:0.3	A11:0.7;?:0.3	A12:0.7;?:0.3	

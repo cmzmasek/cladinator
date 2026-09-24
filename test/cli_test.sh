@@ -19,9 +19,11 @@ while IFS=$'\t' read -r name tree opts; do
     if [ $rc != 0 ]; then
         echo "FAIL $name: exit code $rc"; tail -3 "$TMP/$name.log"; failed=1; continue
     fi
+    # the "# cladinator <version> (<date>)" line is left out so that a version bump does not change every table
+    grep -v '^# cladinator ' "$out" > "$out.cmp"
     if [ $update = 1 ]; then
-        cp "$out" "test/cli/expected/$name.tsv"; echo "updated $name"
-    elif ! diff -u "test/cli/expected/$name.tsv" "$out"; then
+        cp "$out.cmp" "test/cli/expected/$name.tsv"; echo "updated $name"
+    elif ! diff -u "test/cli/expected/$name.tsv" "$out.cmp"; then
         echo "FAIL $name: output differs"; failed=1
     fi
 done < test/cli/cases.tsv

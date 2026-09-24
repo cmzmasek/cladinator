@@ -1,2 +1,7 @@
-#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Placement count	Warnings
-1	Q6	A	1.0	n/a	member of clade A	2	
+# input trees: test/data/t06_sep_us.nwk
+# annotation separator: _
+# query pattern: _#\d+_M=(.+)
+# confidence cutoff: 0.7
+# non-homologous query factor: 2.0
+#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Placement count	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
+1	Q6	A	1.0	n/a	member of clade A	2	A:1.0	A:1.0;A_1:0.6;A_2:0.4	A:1.0;A_2:0.6;A_1:0.4	

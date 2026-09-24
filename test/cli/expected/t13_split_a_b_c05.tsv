@@ -1,7 +1,7 @@
-# input trees: test/data/t05_sep_dot.nwk
+# input trees: test/data/t13_split_a_b.nwk
 # annotation separator: .
 # query pattern: _#\d+_M=(.+)
-# confidence cutoff: 0.7
+# confidence cutoff: 0.5
 # non-homologous query factor: 2.0
 #Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Placement count	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
-1	Q5	A	1.0	n/a	member of clade A	2	A:1.0	A:1.0;A.1:0.6;A.2:0.4	A:1.0;A.2:0.6;A.1:0.4	
+1	Q13	A	0.6	n/a	potential for novel sub-species within clade A	2	A:0.6;B:0.4	A.1:0.6;B.1:0.4	A.2:0.6;B.2:0.4	
