@@ -50,7 +50,7 @@
         </javac>
     </target>
 
-    <target name="test" depends="compile-tests">
+    <target name="test" depends="jar,compile-tests">
         <java classname="org.cladinator.CladeAnalysisTest" fork="true" failonerror="true" dir="${basedir}">
             <classpath>
                 <path refid="compile.classpath"/>
@@ -58,6 +58,10 @@
                 <pathelement location="${test.classes.dir}"/>
             </classpath>
         </java>
+        <!-- command-line regression tests against dist/cladinator.jar -->
+        <exec executable="bash" failonerror="true" dir="${basedir}">
+            <arg value="test/cli_test.sh"/>
+        </exec>
     </target>
 
 </project>

@@ -1,0 +1,9 @@
+# name	tree (in test/data)	options (space-separated, may be empty)
+t01_single	t01_single.nwk	
+t02_multi	t02_multi.nwk	
+t04_all_root	t04_all_root.nwk	
+t05_sep_dot	t05_sep_dot.nwk	
+t06_sep_us	t06_sep_us.nwk	-s=_
+t08_underscore_query	t08_underscore_query.nwk	
+t09_long_branch	t09_long_branch.nwk	
+t11_sep_pipe	t11_sep_pipe.nwk	-s=|

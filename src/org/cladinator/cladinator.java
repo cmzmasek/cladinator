@@ -180,8 +180,8 @@ public final class cladinator {
                     ForesterUtil.fatalError(PRG_NAME, "no value for extra processing separator");
                 }
             }
-            if ((extra_processing1_sep != null) && extra_processing1_sep.equals(separator)) {
-                ForesterUtil.fatalError(PRG_NAME, "extra processing separator must not be the same the annotation-separator");
+            if (extra_processing1 && extra_processing1_sep.equals(separator)) {
+                ForesterUtil.fatalError(PRG_NAME, "extra processing separator must not be the same as the annotation-separator");
             }
             boolean extra_processing1_keep = EXTRA_PROCESSING1_KEEP_EXTRA_DEFAULT;
             if (cla.isOptionSet(EXTRA_PROCESSING1_KEEP_EXTRA_OPTION)) {
