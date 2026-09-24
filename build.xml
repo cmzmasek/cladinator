@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="cladinator" default="jar" basedir=".">
+
+    <property name="src.dir" value="src"/>
+    <property name="test.dir" value="test"/>
+    <property name="lib.dir" value="lib"/>
+    <property name="build.dir" value="build"/>
+    <property name="classes.dir" value="${build.dir}/classes"/>
+    <property name="test.classes.dir" value="${build.dir}/test-classes"/>
+    <property name="dist.dir" value="dist"/>
+    <property name="forester.jar" value="${lib.dir}/forester.jar"/>
+    <property name="main.class" value="org.cladinator.cladinator"/>
+
+    <path id="compile.classpath">
+        <pathelement location="${forester.jar}"/>
+    </path>
+
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+        <delete dir="${dist.dir}"/>
+    </target>
+
+    <target name="compile">
+        <mkdir dir="${classes.dir}"/>
+        <javac release="21" debug="true" debuglevel="lines,source" srcdir="${src.dir}"
+               destdir="${classes.dir}" encoding="UTF-8" includeantruntime="false"
+               classpathref="compile.classpath"/>
+    </target>
+
+    <!-- dist/cladinator.jar finds forester.jar next to it via the manifest Class-Path -->
+    <target name="jar" depends="compile">
+        <mkdir dir="${dist.dir}"/>
+        <jar destfile="${dist.dir}/cladinator.jar" basedir="${classes.dir}">
+            <manifest>
+                <attribute name="Main-Class" value="${main.class}"/>
+                <attribute name="Class-Path" value="forester.jar"/>
+            </manifest>
+        </jar>
+        <copy file="${forester.jar}" todir="${dist.dir}"/>
+    </target>
+
+    <target name="compile-tests" depends="compile">
+        <mkdir dir="${test.classes.dir}"/>
+        <javac release="21" debug="true" srcdir="${test.dir}" destdir="${test.classes.dir}"
+               encoding="UTF-8" includeantruntime="false">
+            <classpath>
+                <path refid="compile.classpath"/>
+                <pathelement location="${classes.dir}"/>
+            </classpath>
+        </javac>
+    </target>
+
+    <target name="test" depends="compile-tests">
+        <java classname="org.cladinator.CladeAnalysisTest" fork="true" failonerror="true" dir="${basedir}">
+            <classpath>
+                <path refid="compile.classpath"/>
+                <pathelement location="${classes.dir}"/>
+                <pathelement location="${test.classes.dir}"/>
+            </classpath>
+        </java>
+    </target>
+
+</project>
