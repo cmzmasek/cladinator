@@ -76,6 +76,10 @@ public class CladeAnalysisTest {
             System.out.println("Clade analysis root placement failed");
             failed = true;
         }
+        if (!testLikelyProblematicQuery()) {
+            System.out.println("Likely problematic query failed");
+            failed = true;
+        }
         if (!failed) {
             System.out.println("OK");
         } else {
@@ -104,6 +108,9 @@ public class CladeAnalysisTest {
             return false;
         }
         if (!testCladeAnalysisRootPlacement()) {
+            return false;
+        }
+        if (!testLikelyProblematicQuery()) {
             return false;
         }
         return true;
@@ -931,6 +938,34 @@ public class CladeAnalysisTest {
                 return false;
             }
             if (!isPrefixes(res2.getAllMultiHitPrefixesUp(), "?", 1.0)) {
+                return false;
+            }
+        } catch (final Exception e) {
+            e.printStackTrace(System.out);
+            return false;
+        }
+        return true;
+    }
+
+    // The non-homologous-query check needs branch lengths; without them (all distances 0) it must not flag.
+    private static boolean testLikelyProblematicQuery() {
+        try {
+            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
+            final Pattern q = AnalysisMulti.DEFAULT_QUERY_PATTERN_FOR_PPLACER_TYPE;
+            final String normal = "((((A.1.1:0.1,A.1.2:0.1):0.1,Q_#1_M=1.0:0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)";
+            final String long_branch = "((((A.1.1:0.1,A.1.2:0.1):0.1,Q_#1_M=1.0:5.0):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)";
+            final String no_lengths = "((((A.1.1,A.1.2),Q_#1_M=1.0),(A.2.1,A.2.2)),B.1)";
+            final String only_queries = "(Q_#1_M=0.5:0.1,Q_#2_M=0.5:0.1)";
+            if (AnalysisMulti.likelyProblematicQuery(factory.create(normal, new NHXParser())[0], q, 2)) {
+                return false;
+            }
+            if (!AnalysisMulti.likelyProblematicQuery(factory.create(long_branch, new NHXParser())[0], q, 2)) {
+                return false;
+            }
+            if (AnalysisMulti.likelyProblematicQuery(factory.create(no_lengths, new NHXParser())[0], q, 2)) {
+                return false;
+            }
+            if (AnalysisMulti.likelyProblematicQuery(factory.create(only_queries, new NHXParser())[0], q, 2)) {
                 return false;
             }
         } catch (final Exception e) {

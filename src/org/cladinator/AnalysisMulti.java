@@ -61,6 +61,10 @@ public final class AnalysisMulti {
                     s.addValue(i.calculateDistanceToRoot());
                 }
             }
+            // Without reference leaves or without branch lengths (all distances 0) there is nothing to compare to.
+            if ((s.getN() < 1) || (s.getMax() <= 0.0)) {
+                return false;
+            }
             final double max_distance_to_root = s.getMax();
             boolean all_outliers = true;
             for (final PhylogenyNode q : qnodes) {
