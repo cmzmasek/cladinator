@@ -420,7 +420,6 @@ public final class cladinator {
                 printRow(counter, res.getQueryNamePrefix(), r.getPrefix(), r.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, res.getNumberOfMatches(), false, w);
             }
         }
-        w.write("\n");
         w.flush();
     }
 
@@ -477,7 +476,7 @@ public final class cladinator {
 
         w.write("\t");
         w.write(String.valueOf(placements));
-        w.write("\n"); // needed?
+        w.write("\n");
         w.flush();
     }
 
