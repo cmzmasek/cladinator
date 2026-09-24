@@ -9,6 +9,10 @@
     <property name="test.classes.dir" value="${build.dir}/test-classes"/>
     <property name="dist.dir" value="dist"/>
     <property name="forester.jar" value="${lib.dir}/forester.jar"/>
+    <!-- JUnit's single-jar console launcher, downloaded on first use (git-ignored) -->
+    <property name="junit.version" value="6.1.3"/>
+    <property name="junit.sha256" value="e62b96ac475dbcde8599ea905d088f65d90778f86e259b856a49fa5c4ea256ec"/>
+    <property name="junit.jar" value="${lib.dir}/junit-platform-console-standalone-${junit.version}.jar"/>
     <property name="main.class" value="org.cladinator.cladinator"/>
 
     <path id="compile.classpath">
@@ -39,24 +43,38 @@
         <copy file="${forester.jar}" todir="${dist.dir}"/>
     </target>
 
-    <target name="compile-tests" depends="compile">
+    <target name="junit-jar">
+        <get src="https://repo1.maven.org/maven2/org/junit/platform/junit-platform-console-standalone/${junit.version}/junit-platform-console-standalone-${junit.version}.jar"
+             dest="${junit.jar}" skipexisting="true"/>
+        <checksum file="${junit.jar}" algorithm="SHA-256" property="${junit.sha256}" verifyproperty="junit.jar.ok"/>
+        <fail message="${junit.jar} does not have the expected SHA-256 checksum; delete it and run again">
+            <condition>
+                <isfalse value="${junit.jar.ok}"/>
+            </condition>
+        </fail>
+    </target>
+
+    <target name="compile-tests" depends="compile,junit-jar">
         <mkdir dir="${test.classes.dir}"/>
         <javac release="21" debug="true" srcdir="${test.dir}" destdir="${test.classes.dir}"
                encoding="UTF-8" includeantruntime="false">
             <classpath>
                 <path refid="compile.classpath"/>
                 <pathelement location="${classes.dir}"/>
+                <pathelement location="${junit.jar}"/>
             </classpath>
         </javac>
     </target>
 
     <target name="test" depends="jar,compile-tests">
-        <java classname="org.cladinator.CladeAnalysisTest" fork="true" failonerror="true" dir="${basedir}">
-            <classpath>
-                <path refid="compile.classpath"/>
-                <pathelement location="${classes.dir}"/>
-                <pathelement location="${test.classes.dir}"/>
-            </classpath>
+        <java jar="${junit.jar}" fork="true" failonerror="true" dir="${basedir}">
+            <arg value="execute"/>
+            <arg value="--class-path"/>
+            <arg path="${forester.jar}:${classes.dir}:${test.classes.dir}"/>
+            <arg value="--scan-class-path"/>
+            <arg value="--fail-if-no-tests"/>
+            <arg value="--disable-banner"/>
+            <arg value="--details=summary"/>
         </java>
         <!-- command-line regression tests against dist/cladinator.jar -->
         <exec executable="bash" failonerror="true" dir="${basedir}">

@@ -21,701 +21,414 @@
 
 package org.cladinator;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.File;
+import java.util.List;
+import java.util.regex.Pattern;
+
 import org.forester.io.parsers.PhylogenyParser;
 import org.forester.io.parsers.nhx.NHXParser;
 import org.forester.io.parsers.util.ParserUtils;
 import org.forester.phylogeny.Phylogeny;
 import org.forester.phylogeny.factories.ParserBasedPhylogenyFactory;
 import org.forester.phylogeny.factories.PhylogenyFactory;
-import org.forester.util.ForesterUtil;
 import org.forester.util.UserException;
+import org.junit.jupiter.api.Test;
 
-import java.io.File;
-import java.util.List;
-import java.util.regex.Pattern;
+import org.cladinator.Classification.Conclusion;
 
-public class CladeAnalysisTest {
+class CladeAnalysisTest {
 
-    private final static String PATH_TO_TEST_DATA = System.getProperty("user.dir") + ForesterUtil.getFileSeparator()
-            + "test/data" + ForesterUtil.getFileSeparator();
+    private static final PhylogenyFactory FACTORY = ParserBasedPhylogenyFactory.getInstance();
+    private static final String TEST_DATA = "test" + File.separator + "data" + File.separator;
+    private static final double DELTA = 1E-9;
+    private static final Pattern QUERY = AnalysisMulti.DEFAULT_QUERY_PATTERN_FOR_PPLACER_TYPE;
 
-    public static void main(final String[] args) {
-        boolean failed = false;
-        if (!testCladeAnalysis3()) {
-            System.out.println("Clade analysis 3 failed");
-            failed = true;
-        }
-        if (!testCladeAnalysis4()) {
-            System.out.println("Clade analysis 4 failed");
-            failed = true;
-        }
-        if (!testCladeAnalysis5()) {
-            System.out.println("Clade analysis 5 failed");
-            failed = true;
-        }
-        if (!testCladeAnalysis6()) {
-            System.out.println("Clade analysis 6 failed");
-            failed = true;
-        }
-        if (!testCladeAnalysisSeparator()) {
-            System.out.println("Clade analysis separator failed");
-            failed = true;
-        }
-        if (!testCladeAnalysisManyPrefixes()) {
-            System.out.println("Clade analysis many prefixes failed");
-            failed = true;
-        }
-        if (!testCladeAnalysisRootPlacement()) {
-            System.out.println("Clade analysis root placement failed");
-            failed = true;
-        }
-        if (!testLikelyProblematicQuery()) {
-            System.out.println("Likely problematic query failed");
-            failed = true;
-        }
-        if (!testConfidenceRenormalization()) {
-            System.out.println("Confidence renormalization failed");
-            failed = true;
-        }
-        if (!testClassification()) {
-            System.out.println("Classification failed");
-            failed = true;
-        }
-        if (!testDistanceThreshold()) {
-            System.out.println("Distance threshold failed");
-            failed = true;
-        }
-        if (!failed) {
-            System.out.println("OK");
-        } else {
-            System.out.println("NOT OK");
-            System.exit(1);
+    private static Phylogeny tree(final String newick) throws Exception {
+        return FACTORY.create(newick, new NHXParser())[0];
+    }
+
+    private static ResultMulti analyze(final String newick) throws Exception {
+        return AnalysisMulti.execute(tree(newick), ".");
+    }
+
+    private static Classification classify(final String newick, final double cutoff) throws Exception {
+        return Classification.of(analyze(newick), cutoff);
+    }
+
+    /** Asserts a prefix list: prefix, confidence, prefix, confidence, ... */
+    private static void assertPrefixes(final List<Prefix> actual, final Object... prefix_and_confidence) {
+        assertEquals(prefix_and_confidence.length / 2, actual.size(), "number of prefixes in " + actual);
+        for (int i = 0; i < actual.size(); ++i) {
+            assertEquals(prefix_and_confidence[2 * i], actual.get(i).getPrefix(), "prefix " + i + " of " + actual);
+            assertEquals((Double) prefix_and_confidence[2 * i + 1], actual.get(i).getConfidence(), 1E-4,
+                    "confidence of " + actual.get(i));
         }
     }
 
-    public static boolean test() {
-        if (!testCladeAnalysis3()) {
-            return false;
+    private static ResultMulti withPrefixes(final String separator, final Object... prefix_and_confidence) {
+        final ResultMulti res = new ResultMulti(separator);
+        for (int i = 0; i < prefix_and_confidence.length; i += 2) {
+            res.addGreatestCommonPrefix((String) prefix_and_confidence[i], (Double) prefix_and_confidence[i + 1]);
         }
-        if (!testCladeAnalysis4()) {
-            return false;
-        }
-        if (!testCladeAnalysisSeparator()) {
-            return false;
-        }
-        if (!testCladeAnalysisManyPrefixes()) {
-            return false;
-        }
-        if (!testCladeAnalysisRootPlacement()) {
-            return false;
-        }
-        if (!testLikelyProblematicQuery()) {
-            return false;
-        }
-        if (!testConfidenceRenormalization()) {
-            return false;
-        }
-        if (!testClassification()) {
-            return false;
-        }
-        if (!testDistanceThreshold()) {
-            return false;
-        }
-        return true;
+        res.analyze();
+        return res;
     }
 
-    private static boolean testCladeAnalysis3() {
-        try {
-            final ResultMulti res1 = new ResultMulti();
-            res1.addGreatestCommonPrefix("A.1.1", 0.3);
-            res1.addGreatestCommonPrefix("A.1.2", 0.3);
-            res1.addGreatestCommonPrefix("A.1.3", 0.3);
-            res1.addGreatestCommonPrefix("B.1", 0.1);
-            res1.analyze();
-            System.out.print(res1.toString());
-            System.out.println("------------------------- ");
-            System.out.println();
-            final ResultMulti res2 = new ResultMulti(".");
-            res2.addGreatestCommonPrefix("A.1.1.1", 0.1);
-            res2.addGreatestCommonPrefix("A.1", 0.7);
-            res2.addGreatestCommonPrefix("A.1.2", 0.1);
-            res2.addGreatestCommonPrefix("B.1", 0.1);
-            res2.analyze();
-            System.out.print(res2.toString());
-            System.out.println("------------------------- ");
-            System.out.println();
-            final ResultMulti res3 = new ResultMulti(".");
-            res3.addGreatestCommonPrefix("A.1.1.1", 0.1);
-            res3.addGreatestCommonPrefix("A.1.1.1.1", 0.6);
-            res3.addGreatestCommonPrefix("A.1", 0.1);
-            res3.addGreatestCommonPrefix("A.1.2", 0.1);
-            res3.addGreatestCommonPrefix("B.1", 0.1);
-            res3.analyze();
-            System.out.print(res3.toString());
-            System.out.println("------------------------- ");
-            System.out.println();
-            final ResultMulti res33 = new ResultMulti(".");
-            res33.addGreatestCommonPrefix("A.1.1.1", 0.1);
-            res33.addGreatestCommonPrefix("A.1.1.1.1", 0.3);
-            res33.addGreatestCommonPrefix("A.1", 0.1);
-            res33.addGreatestCommonPrefix("A.1.2", 0.1);
-            res33.addGreatestCommonPrefix("B.1", 0.1);
-            res33.addGreatestCommonPrefix("B.1.1.1", 0.3);
-            res33.analyze();
-            System.out.print(res33.toString());
-            System.out.println("------------------------- ");
-            System.out.println();
-            final ResultMulti res4 = new ResultMulti();
-            res4.addGreatestCommonPrefix("A.1.1.1.1", 0.35);
-            res4.addGreatestCommonPrefix("A.1.1.1.2", 0.35);
-            res4.addGreatestCommonPrefix("A.1", 0.1);
-            res4.addGreatestCommonPrefix("A.1.2", 0.1);
-            res4.addGreatestCommonPrefix("B.1", 0.1);
-            res4.analyze();
-            System.out.print(res4.toString());
-            System.out.println("------------------------- ");
-            System.out.println();
-            final ResultMulti res5 = new ResultMulti();
-            res5.addGreatestCommonPrefix("A.1.1.1.1", 0.2);
-            res5.addGreatestCommonPrefix("C.2.3", 0.2);
-            res5.addGreatestCommonPrefix("A.1.5", 0.1);
-            res5.addGreatestCommonPrefix("A.3.1.4", 0.2);
-            res5.addGreatestCommonPrefix("B.1.1", 0.2);
-            res5.addGreatestCommonPrefix("B.1.2", 0.09);
-            res5.addGreatestCommonPrefix("D.1.1.1.1", 0.01);
-            res5.analyze();
-            System.out.print(res5.toString());
-            System.out.println("------------------------- ");
-            System.out.println();
-            final ResultMulti res6 = new ResultMulti();
-            res6.addGreatestCommonPrefix("A.1.1.1", 0.05);
-            res6.addGreatestCommonPrefix("A.1.1.1.1", 0.65);
-            res6.addGreatestCommonPrefix("A.1", 0.1);
-            res6.addGreatestCommonPrefix("A.1.2", 0.1);
-            res6.addGreatestCommonPrefix("B.1", 0.1);
-            res6.analyze();
-            System.out.print(res6.toString());
-            System.out.println("------------------------- ");
-            System.out.println();
-            final ResultMulti res7 = new ResultMulti();
-            res7.addGreatestCommonPrefix("A.1.1.1", 0.07);
-            res7.addGreatestCommonPrefix("A.1.1.1.1", 0.9);
-            res7.addGreatestCommonPrefix("A.1", 0.01);
-            res7.addGreatestCommonPrefix("A.1.2", 0.01);
-            res7.addGreatestCommonPrefix("B.1", 0.01);
-            res7.analyze();
-            System.out.print(res7.toString());
-            System.out.println("------------------------- ");
-            System.out.println();
-            final ResultMulti res8 = new ResultMulti("_/_");
-            res8.addGreatestCommonPrefix("AA_/_abc_/_def", 0.07);
-            res8.addGreatestCommonPrefix("AA_/_abc_/_sfc", 0.9);
-            res8.addGreatestCommonPrefix("AA_/_abc_/_xcd", 0.01);
-            res8.addGreatestCommonPrefix("AA_/_abc_/_memr", 0.01);
-            res8.addGreatestCommonPrefix("AA_/_abc_/_fkem_/_odem", 0.01);
-            res8.analyze();
-            System.out.print(res8.toString());
-            System.out.println("------------------------- ");
-            System.out.println();
-            final ResultMulti res9 = new ResultMulti("_/_");
-            res9.addGreatestCommonPrefix("AA_/_abc_/_def", 0.07);
-            res9.addGreatestCommonPrefix("AA_/_abc_/_sfc", 0.6);
-            res9.addGreatestCommonPrefix("AA_/_abc_/_xcd", 0.01);
-            res9.addGreatestCommonPrefix("AA_/_abc_/_memr", 0.01);
-            res9.addGreatestCommonPrefix("AA_/_abc_/_fkem_/_odem", 0.01);
-            res9.addGreatestCommonPrefix("BB_/_fke_/_dme_/_nx2", 0.3);
-            res9.analyze();
-            System.out.print(res9.toString());
-            System.out.println("------------------------- ");
-            System.out.println();
-        } catch (final Exception e) {
-            e.printStackTrace(System.out);
-            return false;
-        }
-        return true;
+    // ---- ResultMulti: prefixes are summed over their levels, sorted, and collapsed to one per top-level clade
+
+    @Test
+    void collapsedPrefixes() {
+        assertPrefixes(withPrefixes(".", "A.1.1", 0.3, "A.1.2", 0.3, "A.1.3", 0.3, "B.1", 0.1).getCollapsedMultiHitPrefixes(),
+                "A.1", 0.9, "B.1", 0.1);
+        assertPrefixes(withPrefixes(".", "A.1.1.1", 0.1, "A.1", 0.7, "A.1.2", 0.1, "B.1", 0.1).getCollapsedMultiHitPrefixes(),
+                "A.1", 0.9, "B.1", 0.1);
+        assertPrefixes(withPrefixes(".", "A.1.1.1", 0.1, "A.1.1.1.1", 0.6, "A.1", 0.1, "A.1.2", 0.1, "B.1", 0.1).getCollapsedMultiHitPrefixes(),
+                "A.1", 0.9, "B.1", 0.1);
+        assertPrefixes(withPrefixes(".", "A.1.1.1", 0.1, "A.1.1.1.1", 0.3, "A.1", 0.1, "A.1.2", 0.1, "B.1", 0.1, "B.1.1.1", 0.3).getCollapsedMultiHitPrefixes(),
+                "A.1", 0.6, "B.1", 0.4);
+        assertPrefixes(withPrefixes(".", "A.1.1.1.1", 0.35, "A.1.1.1.2", 0.35, "A.1", 0.1, "A.1.2", 0.1, "B.1", 0.1).getCollapsedMultiHitPrefixes(),
+                "A.1", 0.9, "B.1", 0.1);
+        assertPrefixes(withPrefixes(".", "A.1.1.1.1", 0.2, "C.2.3", 0.2, "A.1.5", 0.1, "A.3.1.4", 0.2, "B.1.1", 0.2, "B.1.2", 0.09, "D.1.1.1.1", 0.01).getCollapsedMultiHitPrefixes(),
+                "A", 0.5, "B.1", 0.29, "C.2.3", 0.2, "D.1.1.1.1", 0.01);
+        assertPrefixes(withPrefixes(".", "A.1.1.1", 0.05, "A.1.1.1.1", 0.65, "A.1", 0.1, "A.1.2", 0.1, "B.1", 0.1).getCollapsedMultiHitPrefixes(),
+                "A.1", 0.9, "B.1", 0.1);
+        assertPrefixes(withPrefixes(".", "A.1.1.1", 0.07, "A.1.1.1.1", 0.9, "A.1", 0.01, "A.1.2", 0.01, "B.1", 0.01).getCollapsedMultiHitPrefixes(),
+                "A.1", 0.99, "B.1", 0.01);
     }
 
-    private static boolean testCladeAnalysis4() {
-        try {
-            final File intreefile1 = new File(PATH_TO_TEST_DATA + "pplacer_2.tre");
-            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
-            final PhylogenyParser pp = ParserUtils.createParserDependingOnFileType(intreefile1, true);
-            final Phylogeny p1 = factory.create(intreefile1, pp)[0];
-            final ResultMulti res2 = AnalysisMulti.execute(p1);
-            res2.analyze();
-            System.out.print(res2.toString());
-            System.out.println("------------------------- ");
-            System.out.println();
-        } catch (final Exception e) {
-            e.printStackTrace(System.out);
-            return false;
-        }
-        return true;
+    @Test
+    void collapsedPrefixesWithMultiCharacterSeparator() {
+        assertPrefixes(withPrefixes("_/_", "AA_/_abc_/_def", 0.07, "AA_/_abc_/_sfc", 0.9, "AA_/_abc_/_xcd", 0.01,
+                "AA_/_abc_/_memr", 0.01, "AA_/_abc_/_fkem_/_odem", 0.01).getCollapsedMultiHitPrefixes(),
+                "AA_/_abc", 1.0);
+        assertPrefixes(withPrefixes("_/_", "AA_/_abc_/_def", 0.07, "AA_/_abc_/_sfc", 0.6, "AA_/_abc_/_xcd", 0.01,
+                "AA_/_abc_/_memr", 0.01, "AA_/_abc_/_fkem_/_odem", 0.01, "BB_/_fke_/_dme_/_nx2", 0.3).getCollapsedMultiHitPrefixes(),
+                "AA_/_abc", 0.7, "BB_/_fke_/_dme_/_nx2", 0.3);
     }
 
-    private static boolean testCladeAnalysis5() {
-        try {
-            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
-            final String t1s = "(((((A.1.1,Q_#1_M=1),A.1.2),(A.2.1,A.2.2)),((A.3.1,A.3.2),(A.4.1,A.4.2))),(((B.1,B.2),B.3),(C.1,C.2)))";
-            final Phylogeny t1 = factory.create(t1s, new NHXParser())[0];
-            final ResultMulti res1 = AnalysisMulti.execute(t1, ".");
-            res1.analyze();
-            System.out.print(res1.toString());
-            System.out.println("------------------------- ");
-            System.out.println();
+    // ---- AnalysisMulti on trees
 
-
-        } catch (final Exception e) {
-            e.printStackTrace(System.out);
-            return false;
-        }
-        return true;
+    @Test
+    void realPplacerOutput() throws Exception {
+        final File file = new File(TEST_DATA + "pplacer_2.tre");
+        final PhylogenyParser parser = ParserUtils.createParserDependingOnFileType(file, true);
+        final ResultMulti res = AnalysisMulti.execute(FACTORY.create(file, parser)[0]);
+        assertEquals("CED9_CAEBR", res.getQueryNamePrefix());
+        assertEquals(7, res.getNumberOfMatches());
+        assertEquals(14, res.getReferenceTreeNumberOfExternalNodes());
+        assertPrefixes(res.getCollapsedMultiHitPrefixes(), "A", 0.7707, "?", 0.2293);
+        assertPrefixes(res.getCollapsedMultiHitPrefixesDown(), "A", 1.0);
+        assertPrefixes(res.getCollapsedMultiHitPrefixesUp(), "A", 0.7707, "C.5", 0.2293);
     }
 
-    private static boolean testCladeAnalysis6() {
-        try {
-            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
-            final String t1s = "(((((A.1.1,A.1.2),Q_#0_M=0.5),((A.2.1,A.2.2),Q_#1_M=0.5)),((A.3.1,A.3.2),(A.4.1,A.4.2))),(((B.1,B.2),B.3),(C.1,C.2)))";
-            final Phylogeny t1 = factory.create(t1s, new NHXParser())[0];
-            final ResultMulti res1 = AnalysisMulti.execute(t1, ".");
-            res1.analyze();
-            System.out.print(res1.toString());
-            System.out.println("------------------------- ");
-            System.out.println();
-
-
-        } catch (final Exception e) {
-            e.printStackTrace(System.out);
-            return false;
-        }
-        return true;
+    @Test
+    void singlePlacementWithinSubclade() throws Exception {
+        final ResultMulti res = analyze("(((((A.1.1,Q_#1_M=1),A.1.2),(A.2.1,A.2.2)),((A.3.1,A.3.2),(A.4.1,A.4.2))),(((B.1,B.2),B.3),(C.1,C.2)))");
+        assertEquals("Q", res.getQueryNamePrefix());
+        assertEquals(1, res.getNumberOfMatches());
+        assertEquals(13, res.getReferenceTreeNumberOfExternalNodes());
+        assertPrefixes(res.getCollapsedMultiHitPrefixes(), "A.1", 1.0);
+        assertPrefixes(res.getCollapsedMultiHitPrefixesDown(), "A.1.1", 1.0);
+        assertPrefixes(res.getCollapsedMultiHitPrefixesUp(), "A.1.2", 1.0);
     }
 
-    // The same tree labeled with "." and with "_" as annotation separator must give the same result.
-    private static boolean testCladeAnalysisSeparator() {
-        try {
-            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
-            final String dot = "((((A.1.1,A.1.2),Q_#1_M=0.6),((A.2.1,A.2.2),Q_#2_M=0.4)),((B.1.1,B.1.2),B.2.1))";
-            final String us = "((((A_1_1,A_1_2),Q_#1_M=0.6),((A_2_1,A_2_2),Q_#2_M=0.4)),((B_1_1,B_1_2),B_2_1))";
-            final ResultMulti res_dot = AnalysisMulti.execute(factory.create(dot, new NHXParser())[0], ".");
-            final ResultMulti res_us = AnalysisMulti.execute(factory.create(us, new NHXParser())[0], "_");
-            if (!res_dot.getAllMultiHitPrefixesDown().get(0).getPrefix().equals("A")) {
-                return false;
-            }
-            if (!res_dot.getAllMultiHitPrefixesUp().get(0).getPrefix().equals("A")) {
-                return false;
-            }
-            if (!samePrefixes(res_dot.getAllMultiHitPrefixes(), res_us.getAllMultiHitPrefixes())) {
-                return false;
-            }
-            if (!samePrefixes(res_dot.getCollapsedMultiHitPrefixes(), res_us.getCollapsedMultiHitPrefixes())) {
-                return false;
-            }
-            if (!samePrefixes(res_dot.getAllMultiHitPrefixesDown(), res_us.getAllMultiHitPrefixesDown())) {
-                return false;
-            }
-            if (!samePrefixes(res_dot.getCollapsedMultiHitPrefixesDown(), res_us.getCollapsedMultiHitPrefixesDown())) {
-                return false;
-            }
-            if (!samePrefixes(res_dot.getAllMultiHitPrefixesUp(), res_us.getAllMultiHitPrefixesUp())) {
-                return false;
-            }
-            if (!samePrefixes(res_dot.getCollapsedMultiHitPrefixesUp(), res_us.getCollapsedMultiHitPrefixesUp())) {
-                return false;
-            }
-        } catch (final Exception e) {
-            e.printStackTrace(System.out);
-            return false;
-        }
-        return true;
+    @Test
+    void twoPlacementsInSisterSubclades() throws Exception {
+        final ResultMulti res = analyze("(((((A.1.1,A.1.2),Q_#0_M=0.5),((A.2.1,A.2.2),Q_#1_M=0.5)),((A.3.1,A.3.2),(A.4.1,A.4.2))),(((B.1,B.2),B.3),(C.1,C.2)))");
+        assertEquals(2, res.getNumberOfMatches());
+        assertPrefixes(res.getCollapsedMultiHitPrefixes(), "A", 1.0);
+        assertPrefixes(res.getAllMultiHitPrefixesDown(), "A", 1.0, "A.1", 0.5, "A.2", 0.5);
+        assertPrefixes(res.getAllMultiHitPrefixesUp(), "A", 1.0, "A.1", 0.5, "A.2", 0.5);
     }
 
-    // Placements next to 40 clades give 40+ prefixes; lists must come out sorted by descending confidence
-    // (the sort misbehaved from 32 elements on).
-    private static boolean testCladeAnalysisManyPrefixes() {
-        try {
-            final int n = 40;
-            final double total = n * (n + 1) / 2.0;
-            final StringBuilder sb = new StringBuilder("(");
-            for (int k = 1; k <= n; ++k) {
-                if (k > 1) {
-                    sb.append(",");
-                }
-                sb.append("(((X").append(k).append(".1.1,X").append(k).append(".1.2),Q_#").append(k)
-                        .append("_M=").append(k / total).append("),(X").append(k).append(".2.1,X").append(k)
-                        .append(".2.2))");
-            }
-            sb.append(")");
-            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
-            final ResultMulti res = AnalysisMulti.execute(factory.create(sb.toString(), new NHXParser())[0], ".");
-            if (res.getAllMultiHitPrefixes().size() != n) {
-                return false;
-            }
-            if (!res.getAllMultiHitPrefixes().get(0).getPrefix().equals("X" + n)) {
-                return false;
-            }
-            if (!res.getAllMultiHitPrefixesDown().get(0).getPrefix().equals("X" + n + ".1")) {
-                return false;
-            }
-            if (!res.getAllMultiHitPrefixesUp().get(0).getPrefix().equals("X" + n + ".2")) {
-                return false;
-            }
-            for (final List<Prefix> l : List.of(res.getAllMultiHitPrefixes(),
-                    res.getCollapsedMultiHitPrefixes(),
-                    res.getAllMultiHitPrefixesDown(),
-                    res.getCollapsedMultiHitPrefixesDown(),
-                    res.getAllMultiHitPrefixesUp(),
-                    res.getCollapsedMultiHitPrefixesUp())) {
-                for (int i = 1; i < l.size(); ++i) {
-                    if (l.get(i).getConfidence() > l.get(i - 1).getConfidence()) {
-                        return false;
-                    }
-                }
-            }
-        } catch (final Exception e) {
-            e.printStackTrace(System.out);
-            return false;
-        }
-        return true;
+    @Test
+    void separatorIsUsedThroughout() throws Exception {
+        final ResultMulti dot = analyze("((((A.1.1,A.1.2),Q_#1_M=0.6),((A.2.1,A.2.2),Q_#2_M=0.4)),((B.1.1,B.1.2),B.2.1))");
+        final ResultMulti us = AnalysisMulti.execute(tree("((((A_1_1,A_1_2),Q_#1_M=0.6),((A_2_1,A_2_2),Q_#2_M=0.4)),((B_1_1,B_1_2),B_2_1))"), "_");
+        assertPrefixes(dot.getAllMultiHitPrefixesDown(), "A", 1.0, "A.1", 0.6, "A.2", 0.4);
+        assertPrefixes(us.getAllMultiHitPrefixesDown(), "A", 1.0, "A_1", 0.6, "A_2", 0.4);
+        assertPrefixes(us.getAllMultiHitPrefixesUp(), "A", 1.0, "A_2", 0.6, "A_1", 0.4);
+        assertPrefixes(us.getCollapsedMultiHitPrefixes(), "A", 1.0);
     }
 
-    // A placement attached to the root has no bracketing clades: it counts as "?" in the up/down lists
-    // too, so that they still add up to 1.0 next to other placements.
-    private static boolean testCladeAnalysisRootPlacement() {
-        try {
-            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
-            final String t = "(Q_#1_M=0.3,(((A.1.1,Q_#2_M=0.7),A.1.2),(A.2.1,A.2.2)),((B.1.1,B.1.2),B.2.1))";
-            final ResultMulti res = AnalysisMulti.execute(factory.create(t, new NHXParser())[0], ".");
-            if (!isPrefixes(res.getAllMultiHitPrefixes(), "A.1", 0.7, "?", 0.3)) {
-                return false;
-            }
-            if (!isPrefixes(res.getAllMultiHitPrefixesDown(), "A.1.1", 0.7, "?", 0.3)) {
-                return false;
-            }
-            if (!isPrefixes(res.getAllMultiHitPrefixesUp(), "A.1.2", 0.7, "?", 0.3)) {
-                return false;
-            }
-            final String all_root = "(Q_#1_M=1.0,((A.1.1,A.1.2),A.2.1),((B.1.1,B.1.2),B.2.1))";
-            final ResultMulti res2 = AnalysisMulti.execute(factory.create(all_root, new NHXParser())[0], ".");
-            if (!isPrefixes(res2.getAllMultiHitPrefixes(), "?", 1.0)) {
-                return false;
-            }
-            if (!isPrefixes(res2.getAllMultiHitPrefixesDown(), "?", 1.0)) {
-                return false;
-            }
-            if (!isPrefixes(res2.getAllMultiHitPrefixesUp(), "?", 1.0)) {
-                return false;
-            }
-        } catch (final Exception e) {
-            e.printStackTrace(System.out);
-            return false;
+    @Test
+    void manyPrefixesAreSortedByConfidence() throws Exception {
+        // 40 placements next to 40 clades: the sort misbehaved from 32 elements on
+        final int n = 40;
+        final double total = n * (n + 1) / 2.0;
+        final StringBuilder sb = new StringBuilder("(");
+        for (int k = 1; k <= n; ++k) {
+            sb.append(k > 1 ? "," : "").append("(((X").append(k).append(".1.1,X").append(k).append(".1.2),Q_#")
+                    .append(k).append("_M=").append(k / total).append("),(X").append(k).append(".2.1,X").append(k).append(".2.2))");
         }
-        return true;
+        final ResultMulti res = analyze(sb.append(")").toString());
+        assertEquals(n, res.getAllMultiHitPrefixes().size());
+        assertEquals("X" + n, res.getAllMultiHitPrefixes().get(0).getPrefix());
+        assertEquals("X" + n + ".1", res.getAllMultiHitPrefixesDown().get(0).getPrefix());
+        assertEquals("X" + n + ".2", res.getAllMultiHitPrefixesUp().get(0).getPrefix());
+        for (final List<Prefix> l : List.of(res.getAllMultiHitPrefixes(), res.getCollapsedMultiHitPrefixes(),
+                res.getAllMultiHitPrefixesDown(), res.getCollapsedMultiHitPrefixesDown(),
+                res.getAllMultiHitPrefixesUp(), res.getCollapsedMultiHitPrefixesUp())) {
+            for (int i = 1; i < l.size(); ++i) {
+                assertTrue(l.get(i).getConfidence() <= l.get(i - 1).getConfidence(), "not sorted: " + l);
+            }
+        }
     }
 
-    // The non-homologous-query check needs branch lengths; without them (all distances 0) it must not flag.
-    private static boolean testLikelyProblematicQuery() {
-        try {
-            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
-            final Pattern q = AnalysisMulti.DEFAULT_QUERY_PATTERN_FOR_PPLACER_TYPE;
-            final String normal = "((((A.1.1:0.1,A.1.2:0.1):0.1,Q_#1_M=1.0:0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)";
-            final String long_branch = "((((A.1.1:0.1,A.1.2:0.1):0.1,Q_#1_M=1.0:5.0):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)";
-            final String no_lengths = "((((A.1.1,A.1.2),Q_#1_M=1.0),(A.2.1,A.2.2)),B.1)";
-            final String only_queries = "(Q_#1_M=0.5:0.1,Q_#2_M=0.5:0.1)";
-            if (AnalysisMulti.likelyProblematicQuery(factory.create(normal, new NHXParser())[0], q, 2)) {
-                return false;
-            }
-            if (!AnalysisMulti.likelyProblematicQuery(factory.create(long_branch, new NHXParser())[0], q, 2)) {
-                return false;
-            }
-            if (AnalysisMulti.likelyProblematicQuery(factory.create(no_lengths, new NHXParser())[0], q, 2)) {
-                return false;
-            }
-            if (AnalysisMulti.likelyProblematicQuery(factory.create(only_queries, new NHXParser())[0], q, 2)) {
-                return false;
-            }
-        } catch (final Exception e) {
-            e.printStackTrace(System.out);
-            return false;
-        }
-        return true;
+    @Test
+    void placementOnTheRootCountsAsUnknownInAllLists() throws Exception {
+        final ResultMulti res = analyze("(Q_#1_M=0.3,(((A.1.1,Q_#2_M=0.7),A.1.2),(A.2.1,A.2.2)),((B.1.1,B.1.2),B.2.1))");
+        assertPrefixes(res.getAllMultiHitPrefixes(), "A.1", 0.7, "?", 0.3);
+        assertPrefixes(res.getAllMultiHitPrefixesDown(), "A.1.1", 0.7, "?", 0.3);
+        assertPrefixes(res.getAllMultiHitPrefixesUp(), "A.1.2", 0.7, "?", 0.3);
+        final ResultMulti all_root = analyze("(Q_#1_M=1.0,((A.1.1,A.1.2),A.2.1),((B.1.1,B.1.2),B.2.1))");
+        assertPrefixes(all_root.getAllMultiHitPrefixes(), "?", 1.0);
+        assertPrefixes(all_root.getAllMultiHitPrefixesDown(), "?", 1.0);
+        assertPrefixes(all_root.getAllMultiHitPrefixesUp(), "?", 1.0);
     }
 
-    // Placement confidences that do not add up to 1 (placement programs drop low-weight placements) are
-    // rescaled, with a warning; a sum of 0 is an error.
-    private static boolean testConfidenceRenormalization() {
-        try {
-            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
-            final String t = "((((A.1.1,A.1.2),Q_#1_M=0.95),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.04),B.2.1))";
-            final ResultMulti res = AnalysisMulti.execute(factory.create(t, new NHXParser())[0], ".");
-            if (!isPrefixes(res.getAllMultiHitPrefixes(), "A", 0.95 / 0.99, "B", 0.04 / 0.99)) {
-                return false;
-            }
-            if (res.getWarnings().size() != 1 || !res.getWarnings().get(0).contains("0.99")) {
-                return false;
-            }
-            final String exact = "((((A.1.1,A.1.2),Q_#1_M=0.96),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.04),B.2.1))";
-            final ResultMulti res2 = AnalysisMulti.execute(factory.create(exact, new NHXParser())[0], ".");
-            if (!res2.getWarnings().isEmpty()) {
-                return false;
-            }
-            // within tolerance (real pplacer output is printed with ~6 digits): no warning
-            final String near = "((((A.1.1,A.1.2),Q_#1_M=0.959999),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.04),B.2.1))";
-            final ResultMulti res3 = AnalysisMulti.execute(factory.create(near, new NHXParser())[0], ".");
-            if (!res3.getWarnings().isEmpty()) {
-                return false;
-            }
-            for (final String bad : new String[]{
-                    "((((A.1.1,A.1.2),Q_#1_M=0),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.0),B.2.1))",
-                    "((((A.1.1,A.1.2),Q_#1_M=NaN),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.5),B.2.1))",
-                    "((((A.1.1,A.1.2),Q_#1_M=Infinity),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.5),B.2.1))",
-                    "((((A.1.1,A.1.2),Q_#1_M=-0.5),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=1.5),B.2.1))",
-                    "((((A.1.1,A.1.2),Q_#1_M=abc),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.5),B.2.1))"}) {
-                try {
-                    AnalysisMulti.execute(factory.create(bad, new NHXParser())[0], ".");
-                    return false;
-                } catch (final UserException expected) {
-                    if (expected.getMessage().startsWith("ERROR")) {
-                        return false;
-                    }
-                }
-            }
-        } catch (final Exception e) {
-            e.printStackTrace(System.out);
-            return false;
-        }
-        return true;
+    @Test
+    void likelyProblematicQueryNeedsBranchLengths() throws Exception {
+        assertFalse(AnalysisMulti.likelyProblematicQuery(tree("((((A.1.1:0.1,A.1.2:0.1):0.1,Q_#1_M=1.0:0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)"), QUERY, 2));
+        assertTrue(AnalysisMulti.likelyProblematicQuery(tree("((((A.1.1:0.1,A.1.2:0.1):0.1,Q_#1_M=1.0:5.0):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)"), QUERY, 2));
+        assertFalse(AnalysisMulti.likelyProblematicQuery(tree("((((A.1.1,A.1.2),Q_#1_M=1.0),(A.2.1,A.2.2)),B.1)"), QUERY, 2), "no branch lengths");
+        assertFalse(AnalysisMulti.likelyProblematicQuery(tree("(Q_#1_M=0.5:0.1,Q_#2_M=0.5:0.1)"), QUERY, 2), "no reference leaves");
     }
 
-    private static boolean testClassification() {
-        try {
-            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
-            // the most specific clade reaching the cutoff: 0.9 within A.1 (sister to the single leaf A.1.1), 0.1 in A
-            final String p13 = "(((((A.1.1,Q_#1_M=0.9),A.1.2),(A.1.3,A.1.4)),((A.2.1,A.2.2),Q_#2_M=0.1)),((B.1.1,B.1.2),B.2.1))";
-            Classification c = classify(factory, p13, 0.7);
-            if (!"A.1".equals(c.getAssignment()) || !ForesterUtil.isEqual(c.getConfidence(), 0.9)
-                    || (c.getConclusion() != Classification.Conclusion.NOVEL_WITHIN)
-                    || !ForesterUtil.isEqual(c.getSupport(), 0.9) || (c.getBracketDown() != null)
-                    || (c.getSingleLeafSisters().size() != 1) || !ForesterUtil.isEqual(c.getSingleLeafSisters().get("A.1.1"), 0.9)) {
-                System.out.println("p13: " + describe(c));
-                return false;
-            }
-            // sister to the whole clade A: outside all clades
-            final String p12 = "((((A.1.1,A.1.2),(A.2.1,A.2.2)),Q_#1_M=1.0),OUT.1)";
-            c = classify(factory, p12, 0.7);
-            if ((c.getAssignment() != null) || (c.getConclusion() != Classification.Conclusion.OUTSIDE_SISTER_TO)
-                    || !"A".equals(c.getConclusionClade()) || !ForesterUtil.isEqual(c.getSupport(), 1.0)
-                    || !"A".equals(c.getBracketDown()) || !"OUT.1".equals(c.getBracketUp())) {
-                System.out.println("p12: " + describe(c));
-                return false;
-            }
-            // between the sub-clades A.1 and A.2, sister clade of two leaves: novel within A, no single-leaf note
-            final String t01 = "((((A.1.1,A.1.2),Q_#1_M=1.0),(A.2.1,A.2.2)),((B.1.1,B.1.2),B.2.1))";
-            c = classify(factory, t01, 0.7);
-            if (!"A".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.NOVEL_WITHIN)
-                    || !"A.1".equals(c.getBracketDown()) || !"A.2".equals(c.getBracketUp())
-                    || !c.getSingleLeafSisters().isEmpty()) {
-                System.out.println("t01: " + describe(c));
-                return false;
-            }
-            // two placements, 0.6 sister to A.1 and 0.4 sister to A.2: the same conclusion as t01, support 1.0
-            final String t05 = "((((A.1.1,A.1.2),Q_#1_M=0.6),((A.2.1,A.2.2),Q_#2_M=0.4)),((B.1.1,B.1.2),B.2.1))";
-            c = classify(factory, t05, 0.7);
-            if (!"A".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.NOVEL_WITHIN)
-                    || !ForesterUtil.isEqual(c.getSupport(), 1.0) || (c.getBracketDown() != null)) {
-                System.out.println("t05: " + describe(c));
-                return false;
-            }
-            // among leaves of one label: member
-            final String member = "((((A.1.1,Q_#1_M=1.0),A.1.1),(A.2.1,A.2.2)),B.1)";
-            c = classify(factory, member, 0.7);
-            if (!"A.1.1".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.MEMBER)
-                    || !ForesterUtil.isEqual(c.getSupport(), 1.0)) {
-                System.out.println("member: " + describe(c));
-                return false;
-            }
-            // 0.5 / 0.5 between A and B: no confident assignment, both named
-            final String tie = "((((A.1.1,A.1.2),Q_#1_M=0.5),(A.2.1,A.2.2)),(((B.1.1,B.1.2),Q_#2_M=0.5),(B.2.1,B.2.2)))";
-            c = classify(factory, tie, 0.7);
-            if ((c.getAssignment() != null) || (c.getConclusion() != Classification.Conclusion.NO_CONFIDENT_ASSIGNMENT)
-                    || (c.getBestMatches().size() != 2) || !"A".equals(c.getBestMatches().get(0).getPrefix())
-                    || !"B".equals(c.getBestMatches().get(1).getPrefix())) {
-                System.out.println("tie: " + describe(c));
-                return false;
-            }
-            // sub-clades A.1 and A.2 both reach a cutoff of 0.5: the walk stops at A, member (both are within sub-clades)
-            final String subtie = "(((((A.1.1,Q_#1_M=0.5),A.1.2),((A.2.1,Q_#2_M=0.5),A.2.2)),(A.3.1,A.3.2)),((B.1.1,B.1.2),B.2.1))";
-            c = classify(factory, subtie, 0.5);
-            if (!"A".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.MEMBER)
-                    || !ForesterUtil.isEqual(c.getSupport(), 1.0) || (c.getCompetingSubclades().size() != 2)
-                    || !"A.1".equals(c.getCompetingSubclades().get(0).getPrefix())) {
-                System.out.println("subtie: " + describe(c));
-                return false;
-            }
-            // the same tree at 0.7: A, member, no competing sub-clades
-            c = classify(factory, subtie, 0.7);
-            if (!"A".equals(c.getAssignment()) || !c.getCompetingSubclades().isEmpty()) {
-                System.out.println("subtie 0.7: " + describe(c));
-                return false;
-            }
-            // everything on the root: outside all clades
-            final String root = "(Q_#1_M=1.0,((A.1.1,A.1.2),A.2.1),((B.1.1,B.1.2),B.2.1))";
-            c = classify(factory, root, 0.7);
-            if ((c.getAssignment() != null) || (c.getConclusion() != Classification.Conclusion.OUTSIDE)
-                    || !ForesterUtil.isEqual(c.getConfidence(), 1.0)) {
-                System.out.println("root: " + describe(c));
-                return false;
-            }
-            // pendant length and reference depth from the branch lengths; none without them
-            final String lengths = "((((A.1.1:0.1,A.1.2:0.1):0.1,Q_#1_M=1.0:0.25):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,((B.1.1:0.1,B.1.2:0.1):0.1,B.2.1:0.1):0.1)";
-            final ResultMulti res = AnalysisMulti.execute(factory.create(lengths, new NHXParser())[0], ".");
-            c = Classification.of(res, 0.7);
-            if ((c.getPendantLength() == null) || !ForesterUtil.isEqual(c.getPendantLength(), 0.25)
-                    || (res.getReferenceDepth() == null) || !ForesterUtil.isEqual(res.getReferenceDepth(), 0.4)) {
-                System.out.println("lengths: " + c.getPendantLength() + " " + res.getReferenceDepth());
-                return false;
-            }
-            final ResultMulti res2 = AnalysisMulti.execute(factory.create(t01, new NHXParser())[0], ".");
-            if ((Classification.of(res2, 0.7).getPendantLength() != null) || (res2.getReferenceDepth() != null)) {
-                return false;
-            }
-            try {
-                Classification.of(res2, 0.0);
-                return false;
-            } catch (final IllegalArgumentException expected) {
-                // ok
-            }
-        } catch (final Exception e) {
-            e.printStackTrace(System.out);
-            return false;
-        }
-        return true;
+    @Test
+    void confidencesAreRescaledToOne() throws Exception {
+        final ResultMulti res = analyze("((((A.1.1,A.1.2),Q_#1_M=0.95),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.04),B.2.1))");
+        assertPrefixes(res.getAllMultiHitPrefixes(), "A", 0.95 / 0.99, "B", 0.04 / 0.99);
+        assertEquals(1, res.getWarnings().size());
+        assertTrue(res.getWarnings().get(0).contains("0.99"), res.getWarnings().get(0));
+        assertTrue(analyze("((((A.1.1,A.1.2),Q_#1_M=0.96),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.04),B.2.1))").getWarnings().isEmpty());
+        // within tolerance (real pplacer output is printed with ~6 digits): no warning
+        assertTrue(analyze("((((A.1.1,A.1.2),Q_#1_M=0.959999),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.04),B.2.1))").getWarnings().isEmpty());
     }
 
-    private static boolean testDistanceThreshold() {
-        try {
-            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
-            // sister to the single leaf A.1.1 at 0.001: distance to A.1.1 is 0.101
-            final String p7 = "((((A.1.1:0.1,Q_#1_M=1.0:0.001):0.1,A.1.2:0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,((B.1.1:0.1,B.1.2:0.1):0.1,B.2.1:0.1):0.1)";
-            final ResultMulti res7 = AnalysisMulti.execute(factory.create(p7, new NHXParser())[0], ".");
-            final Placement pl = res7.getPlacements().get(0);
-            if (!"A.1.1".equals(pl.nearestLeaf()) || !ForesterUtil.isEqual(pl.nearestDistance(), 0.101)) {
-                System.out.println("nearest: " + pl);
-                return false;
-            }
-            Classification c = Classification.of(res7, 0.7, 0.2);
-            if (!"A.1.1".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.MEMBER)
-                    || !"A.1.1".equals(c.getConclusionClade()) || !ForesterUtil.isEqual(c.getSupport(), 1.0)
-                    || !c.isByDistance() || !c.getSingleLeafSisters().isEmpty()
-                    || !"A.1.1".equals(c.getNearestLeaf()) || !ForesterUtil.isEqual(c.getNearestDistance(), 0.101)) {
-                System.out.println("p7 d=0.2: " + describe(c));
-                return false;
-            }
-            c = Classification.of(res7, 0.7, 0.05);
-            if (!"A.1".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.NOVEL_WITHIN)
-                    || !"A.1".equals(c.getConclusionClade()) || !ForesterUtil.isEqual(c.getSupport(), 1.0) || !c.isByDistance()) {
-                System.out.println("p7 d=0.05: " + describe(c));
-                return false;
-            }
-            c = Classification.of(res7, 0.7);
-            if (c.isByDistance() || (c.getConclusion() != Classification.Conclusion.NOVEL_WITHIN) || c.getSingleLeafSisters().isEmpty()) {
-                System.out.println("p7 no d: " + describe(c));
-                return false;
-            }
-            // nested among A.1.1 leaves (member by topology) but on a long branch: novel by distance
-            final String far = "((((A.1.1:0.1,Q_#1_M=1.0:2.0):0.1,A.1.1:0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)";
-            final ResultMulti res_far = AnalysisMulti.execute(factory.create(far, new NHXParser())[0], ".");
-            if (Classification.of(res_far, 0.7).getConclusion() != Classification.Conclusion.MEMBER) {
-                return false;
-            }
-            c = Classification.of(res_far, 0.7, 0.5);
-            if (!"A.1.1".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.NOVEL_WITHIN)
-                    || !ForesterUtil.isEqual(c.getSupport(), 1.0)) {
-                System.out.println("far: " + describe(c));
-                return false;
-            }
-            // the nearest leaf can be in the uncle clade: sister at 0.9, uncle leaf at 0.3
-            final String uncle = "((((A.1.1:0.9,Q_#1_M=1.0:0.1):0.1,A.1.2:0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)";
-            final Placement pu = AnalysisMulti.execute(factory.create(uncle, new NHXParser())[0], ".").getPlacements().get(0);
-            if (!"A.1.2".equals(pu.nearestLeaf()) || !ForesterUtil.isEqual(pu.nearestDistance(), 0.3)) {
-                System.out.println("uncle: " + pu);
-                return false;
-            }
-            // two placements: 0.6 close to A.1.1, 0.4 far: member of A.1.1 with support 0.6, assignment stays A.1
-            final String mixed = "(((((A.1.1:0.1,Q_#1_M=0.6:0.001):0.1,A.1.2:0.1):0.1,((A.1.3:0.1,Q_#2_M=0.4:1.0):0.1,A.1.4:0.1):0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)";
-            c = Classification.of(AnalysisMulti.execute(factory.create(mixed, new NHXParser())[0], "."), 0.7, 0.2);
-            if (!"A.1".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.MEMBER)
-                    || !"A.1.1".equals(c.getConclusionClade()) || !ForesterUtil.isEqual(c.getSupport(), 0.6)) {
-                System.out.println("mixed: " + describe(c));
-                return false;
-            }
-            // close to A.1.1 (0.5) and A.1.2 (0.5): member of their common clade A.1
-            final String tied = "(((((A.1.1:0.1,Q_#1_M=0.5:0.001):0.1,(A.1.2:0.1,Q_#2_M=0.5:0.001):0.1):0.1,(A.1.3:0.1,A.1.4:0.1):0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)";
-            c = Classification.of(AnalysisMulti.execute(factory.create(tied, new NHXParser())[0], "."), 0.7, 0.2);
-            if (!"A.1".equals(c.getAssignment()) || (c.getConclusion() != Classification.Conclusion.MEMBER)
-                    || !"A.1".equals(c.getConclusionClade()) || !ForesterUtil.isEqual(c.getSupport(), 1.0) || !c.isByDistance()) {
-                System.out.println("tied: " + describe(c));
-                return false;
-            }
-            // no branch lengths: the threshold is not applied
-            final String none = "((((A.1.1,Q_#1_M=1.0),A.1.2),(A.2.1,A.2.2)),B.1)";
-            c = Classification.of(AnalysisMulti.execute(factory.create(none, new NHXParser())[0], "."), 0.7, 0.2);
-            if (c.isByDistance() || !c.isDistanceNotApplied() || (c.getConclusion() != Classification.Conclusion.NOVEL_WITHIN)) {
-                System.out.println("none: " + describe(c));
-                return false;
-            }
-            try {
-                Classification.of(res7, 0.7, -1.0);
-                return false;
-            } catch (final IllegalArgumentException expected) {
-                // ok
-            }
-        } catch (final Exception e) {
-            e.printStackTrace(System.out);
-            return false;
+    @Test
+    void invalidConfidencesAreInputErrors() {
+        for (final String bad : new String[]{"0", "NaN", "Infinity", "-0.5", "abc"}) {
+            final String t = "((((A.1.1,A.1.2),Q_#1_M=" + bad + "),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0),B.2.1))";
+            final UserException e = assertThrows(UserException.class, () -> analyze(t), bad);
+            assertFalse(e.getMessage().startsWith("ERROR"), e.getMessage());
         }
-        return true;
     }
 
-    private static Classification classify(final PhylogenyFactory factory, final String tree, final double cutoff)
-            throws Exception {
-        return Classification.of(AnalysisMulti.execute(factory.create(tree, new NHXParser())[0], "."), cutoff);
+    @Test
+    void unrootedTreeIsNoted() throws Exception {
+        assertTrue(analyze("(Q_#1_M=1.0,((A.1.1,A.1.2),A.2.1),((B.1.1,B.1.2),B.2.1))").getWarnings().get(0).contains("3 children"));
+        assertTrue(analyze("((((A.1.1,A.1.2),Q_#1_M=1.0),(A.2.1,A.2.2)),((B.1.1,B.1.2),B.2.1))").getWarnings().isEmpty());
     }
 
-    private static String describe(final Classification c) {
-        return c.getAssignment() + " " + c.getConfidence() + " " + c.getConclusion() + " " + c.getConclusionClade() + " "
-                + c.getSupport() + " [" + c.getBracketDown() + ", " + c.getBracketUp() + "] best=" + c.getBestMatches()
-                + " competing=" + c.getCompetingSubclades() + " single=" + c.getSingleLeafSisters();
+    @Test
+    void leafWithUniqueTopLevelLabelIsNoted() throws Exception {
+        // OUTGROUP inside the clade of A.2.1: every clade containing it has no common label
+        final ResultMulti res = analyze("((((A.1.1,A.1.2),Q_#1_M=1.0),(A.2.1,OUTGROUP)),((B.1.1,B.1.2),B.2.1))");
+        assertEquals(1, res.getWarnings().size());
+        assertTrue(res.getWarnings().get(0).contains("\"OUTGROUP\""), res.getWarnings().get(0));
+        // an outgroup attached to the root is fine
+        assertTrue(analyze("((((A.1.1,A.1.2),(A.2.1,A.2.2)),Q_#1_M=1.0),OUT.1)").getWarnings().isEmpty());
+        // a one-level label shared by two leaves is fine
+        assertTrue(analyze("((((A.1.1,A.1.2),Q_#1_M=1.0),(C,C)),((B.1.1,B.1.2),B.2.1))").getWarnings().isEmpty());
     }
 
-    // prefix_and_confidence: prefix, confidence, prefix, confidence, ...
-    private static boolean isPrefixes(final List<Prefix> l, final Object... prefix_and_confidence) {
-        if (l.size() * 2 != prefix_and_confidence.length) {
-            return false;
-        }
-        for (int i = 0; i < l.size(); ++i) {
-            if (!l.get(i).getPrefix().equals(prefix_and_confidence[2 * i])) {
-                return false;
-            }
-            if (!ForesterUtil.isEqual(l.get(i).getConfidence(), (Double) prefix_and_confidence[2 * i + 1])) {
-                return false;
-            }
-        }
-        return true;
+    // ---- Classification by topology
+
+    @Test
+    void assignmentIsTheMostSpecificCladeReachingTheCutoff() throws Exception {
+        // 0.9 within A.1 (sister to the single leaf A.1.1), 0.1 elsewhere in A
+        final Classification c = classify("(((((A.1.1,Q_#1_M=0.9),A.1.2),(A.1.3,A.1.4)),((A.2.1,A.2.2),Q_#2_M=0.1)),((B.1.1,B.1.2),B.2.1))", 0.7);
+        assertEquals("A.1", c.getAssignment());
+        assertEquals(0.9, c.getConfidence(), DELTA);
+        assertEquals(Conclusion.NOVEL_WITHIN, c.getConclusion());
+        assertEquals(0.9, c.getSupport(), DELTA);
+        assertNull(c.getBracketDown());
+        assertEquals(1, c.getSingleLeafSisters().size());
+        assertEquals(0.9, c.getSingleLeafSisters().get("A.1.1"), DELTA);
     }
 
-    private static boolean samePrefixes(final List<Prefix> dot, final List<Prefix> us) {
-        if (dot.size() != us.size()) {
-            return false;
-        }
-        for (int i = 0; i < dot.size(); ++i) {
-            if (!dot.get(i).getPrefix().equals(us.get(i).getPrefix().replace('_', '.'))) {
-                return false;
-            }
-            if (!ForesterUtil.isEqual(dot.get(i).getConfidence(), us.get(i).getConfidence())) {
-                return false;
-            }
-        }
-        return true;
+    @Test
+    void sisterToAWholeCladeIsOutsideAllClades() throws Exception {
+        final Classification c = classify("((((A.1.1,A.1.2),(A.2.1,A.2.2)),Q_#1_M=1.0),OUT.1)", 0.7);
+        assertNull(c.getAssignment());
+        assertEquals(Conclusion.OUTSIDE_SISTER_TO, c.getConclusion());
+        assertEquals("A", c.getConclusionClade());
+        assertEquals(1.0, c.getSupport(), DELTA);
+        assertEquals("A", c.getBracketDown());
+        assertEquals("OUT.1", c.getBracketUp());
+    }
+
+    @Test
+    void betweenSubcladesIsNovelWithin() throws Exception {
+        final Classification single = classify("((((A.1.1,A.1.2),Q_#1_M=1.0),(A.2.1,A.2.2)),((B.1.1,B.1.2),B.2.1))", 0.7);
+        assertEquals("A", single.getAssignment());
+        assertEquals(Conclusion.NOVEL_WITHIN, single.getConclusion());
+        assertEquals("A.1", single.getBracketDown());
+        assertEquals("A.2", single.getBracketUp());
+        assertTrue(single.getSingleLeafSisters().isEmpty(), "the sister clade has two leaves");
+        // 0.6 sister to A.1 and 0.4 sister to A.2: the same conclusion, support 1.0
+        final Classification two = classify("((((A.1.1,A.1.2),Q_#1_M=0.6),((A.2.1,A.2.2),Q_#2_M=0.4)),((B.1.1,B.1.2),B.2.1))", 0.7);
+        assertEquals("A", two.getAssignment());
+        assertEquals(Conclusion.NOVEL_WITHIN, two.getConclusion());
+        assertEquals(1.0, two.getSupport(), DELTA);
+        assertNull(two.getBracketDown());
+    }
+
+    @Test
+    void amongLeavesOfOneLabelIsMember() throws Exception {
+        final Classification c = classify("((((A.1.1,Q_#1_M=1.0),A.1.1),(A.2.1,A.2.2)),B.1)", 0.7);
+        assertEquals("A.1.1", c.getAssignment());
+        assertEquals(Conclusion.MEMBER, c.getConclusion());
+        assertEquals(1.0, c.getSupport(), DELTA);
+    }
+
+    @Test
+    void topLevelTieIsNoConfidentAssignment() throws Exception {
+        final Classification c = classify("((((A.1.1,A.1.2),Q_#1_M=0.5),(A.2.1,A.2.2)),(((B.1.1,B.1.2),Q_#2_M=0.5),(B.2.1,B.2.2)))", 0.7);
+        assertNull(c.getAssignment());
+        assertEquals(Conclusion.NO_CONFIDENT_ASSIGNMENT, c.getConclusion());
+        assertEquals(2, c.getBestMatches().size());
+        assertEquals("A", c.getBestMatches().get(0).getPrefix());
+        assertEquals("B", c.getBestMatches().get(1).getPrefix());
+    }
+
+    @Test
+    void subcladeTieStopsTheWalk() throws Exception {
+        final String t = "(((((A.1.1,Q_#1_M=0.5),A.1.2),((A.2.1,Q_#2_M=0.5),A.2.2)),(A.3.1,A.3.2)),((B.1.1,B.1.2),B.2.1))";
+        final Classification c = classify(t, 0.5);
+        assertEquals("A", c.getAssignment());
+        assertEquals(Conclusion.MEMBER, c.getConclusion(), "both placements lie within sub-clades of A");
+        assertEquals(1.0, c.getSupport(), DELTA);
+        assertEquals(2, c.getCompetingSubclades().size());
+        assertEquals("A.1", c.getCompetingSubclades().get(0).getPrefix());
+        final Classification at_07 = classify(t, 0.7);
+        assertEquals("A", at_07.getAssignment());
+        assertTrue(at_07.getCompetingSubclades().isEmpty());
+    }
+
+    @Test
+    void everythingOnTheRootIsOutsideAllClades() throws Exception {
+        final Classification c = classify("(Q_#1_M=1.0,((A.1.1,A.1.2),A.2.1),((B.1.1,B.1.2),B.2.1))", 0.7);
+        assertNull(c.getAssignment());
+        assertEquals(Conclusion.OUTSIDE, c.getConclusion());
+        assertEquals(1.0, c.getConfidence(), DELTA);
+    }
+
+    @Test
+    void branchLengthsGivePendantLengthAndReferenceDepth() throws Exception {
+        final ResultMulti res = analyze("((((A.1.1:0.1,A.1.2:0.1):0.1,Q_#1_M=1.0:0.25):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,((B.1.1:0.1,B.1.2:0.1):0.1,B.2.1:0.1):0.1)");
+        assertEquals(0.25, Classification.of(res, 0.7).getPendantLength(), DELTA);
+        assertEquals(0.4, res.getReferenceDepth(), DELTA);
+        final ResultMulti none = analyze("((((A.1.1,A.1.2),Q_#1_M=1.0),(A.2.1,A.2.2)),((B.1.1,B.1.2),B.2.1))");
+        assertNull(Classification.of(none, 0.7).getPendantLength());
+        assertNull(none.getReferenceDepth());
+    }
+
+    @Test
+    void cutoffMustBeInRange() throws Exception {
+        final ResultMulti res = analyze("((((A.1.1,A.1.2),Q_#1_M=1.0),(A.2.1,A.2.2)),((B.1.1,B.1.2),B.2.1))");
+        assertThrows(IllegalArgumentException.class, () -> Classification.of(res, 0.0));
+        assertThrows(IllegalArgumentException.class, () -> Classification.of(res, 1.5));
+        assertThrows(IllegalArgumentException.class, () -> Classification.of(res, Double.NaN));
+    }
+
+    // ---- Classification by distance
+
+    /** Sister to the single leaf A.1.1 at 0.001: the distance to A.1.1 is 0.101. */
+    private static final String SISTER_TO_SINGLE_LEAF = "((((A.1.1:0.1,Q_#1_M=1.0:0.001):0.1,A.1.2:0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,((B.1.1:0.1,B.1.2:0.1):0.1,B.2.1:0.1):0.1)";
+
+    @Test
+    void nearestReferenceLeaf() throws Exception {
+        final Placement p = analyze(SISTER_TO_SINGLE_LEAF).getPlacements().get(0);
+        assertEquals("A.1.1", p.nearestLeaf());
+        assertEquals(0.101, p.nearestDistance(), DELTA);
+        // the nearest leaf can be in the uncle clade: sister at 0.9, uncle leaf at 0.3
+        final Placement u = analyze("((((A.1.1:0.9,Q_#1_M=1.0:0.1):0.1,A.1.2:0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)").getPlacements().get(0);
+        assertEquals("A.1.2", u.nearestLeaf());
+        assertEquals(0.3, u.nearestDistance(), DELTA);
+    }
+
+    @Test
+    void closerThanTheThresholdIsMemberOfTheLeafsClade() throws Exception {
+        final Classification c = Classification.of(analyze(SISTER_TO_SINGLE_LEAF), 0.7, 0.2);
+        assertEquals("A.1.1", c.getAssignment());
+        assertEquals(Conclusion.MEMBER, c.getConclusion());
+        assertEquals("A.1.1", c.getConclusionClade());
+        assertEquals(1.0, c.getSupport(), DELTA);
+        assertTrue(c.isByDistance());
+        assertTrue(c.getSingleLeafSisters().isEmpty());
+        assertEquals("A.1.1", c.getNearestLeaf());
+        assertEquals(0.101, c.getNearestDistance(), DELTA);
+    }
+
+    @Test
+    void fartherThanTheThresholdIsNovelWithinTheClade() throws Exception {
+        final Classification c = Classification.of(analyze(SISTER_TO_SINGLE_LEAF), 0.7, 0.05);
+        assertEquals("A.1", c.getAssignment());
+        assertEquals(Conclusion.NOVEL_WITHIN, c.getConclusion());
+        assertEquals(1.0, c.getSupport(), DELTA);
+        assertTrue(c.isByDistance());
+    }
+
+    @Test
+    void withoutThresholdTheTopologyDecides() throws Exception {
+        final Classification c = Classification.of(analyze(SISTER_TO_SINGLE_LEAF), 0.7);
+        assertFalse(c.isByDistance());
+        assertEquals(Conclusion.NOVEL_WITHIN, c.getConclusion());
+        assertFalse(c.getSingleLeafSisters().isEmpty());
+    }
+
+    @Test
+    void nestedButOnALongBranchIsNovelByDistance() throws Exception {
+        final ResultMulti res = analyze("((((A.1.1:0.1,Q_#1_M=1.0:2.0):0.1,A.1.1:0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)");
+        assertEquals(Conclusion.MEMBER, Classification.of(res, 0.7).getConclusion());
+        final Classification c = Classification.of(res, 0.7, 0.5);
+        assertEquals("A.1.1", c.getAssignment());
+        assertEquals(Conclusion.NOVEL_WITHIN, c.getConclusion());
+        assertEquals(1.0, c.getSupport(), DELTA);
+    }
+
+    @Test
+    void mixedPlacementsKeepTheTopologicalAssignment() throws Exception {
+        // 0.6 close to A.1.1, 0.4 far: member of A.1.1 with support 0.6, the assignment stays A.1
+        final Classification c = Classification.of(analyze("(((((A.1.1:0.1,Q_#1_M=0.6:0.001):0.1,A.1.2:0.1):0.1,((A.1.3:0.1,Q_#2_M=0.4:1.0):0.1,A.1.4:0.1):0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)"), 0.7, 0.2);
+        assertEquals("A.1", c.getAssignment());
+        assertEquals(Conclusion.MEMBER, c.getConclusion());
+        assertEquals("A.1.1", c.getConclusionClade());
+        assertEquals(0.6, c.getSupport(), DELTA);
+    }
+
+    @Test
+    void tiedNearestLeavesCountForTheirCommonClade() throws Exception {
+        final Classification c = Classification.of(analyze("(((((A.1.1:0.1,Q_#1_M=0.5:0.001):0.1,(A.1.2:0.1,Q_#2_M=0.5:0.001):0.1):0.1,(A.1.3:0.1,A.1.4:0.1):0.1):0.1,(A.2.1:0.1,A.2.2:0.1):0.1):0.1,B.1:0.3)"), 0.7, 0.2);
+        assertEquals("A.1", c.getAssignment());
+        assertEquals(Conclusion.MEMBER, c.getConclusion());
+        assertEquals("A.1", c.getConclusionClade());
+        assertEquals(1.0, c.getSupport(), DELTA);
+        assertTrue(c.isByDistance());
+    }
+
+    @Test
+    void thresholdIsNotAppliedWithoutBranchLengths() throws Exception {
+        final Classification c = Classification.of(analyze("((((A.1.1,Q_#1_M=1.0),A.1.2),(A.2.1,A.2.2)),B.1)"), 0.7, 0.2);
+        assertFalse(c.isByDistance());
+        assertTrue(c.isDistanceNotApplied());
+        assertEquals(Conclusion.NOVEL_WITHIN, c.getConclusion());
+    }
+
+    @Test
+    void thresholdMustBeNonNegative() throws Exception {
+        final ResultMulti res = analyze(SISTER_TO_SINGLE_LEAF);
+        assertThrows(IllegalArgumentException.class, () -> Classification.of(res, 0.7, -1.0));
+        assertThrows(IllegalArgumentException.class, () -> Classification.of(res, 0.7, Double.NaN));
+        assertNotNull(Classification.of(res, 0.7, 0.0));
     }
 }
