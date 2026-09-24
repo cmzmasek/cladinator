@@ -185,7 +185,7 @@ java -cp dist/cladinator.jar org.cladinator.cladinator_tree_prepare <in-tree> <o
 
 ## Changes
 
-**Unreleased**
+**3.2.0** (2026-09-24)
 
 - Placement confidences that do not add up to 1 are rescaled, with a warning
   in the new `Warnings` column, instead of stopping the run.
