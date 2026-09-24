@@ -1,5 +1,6 @@
-// forester -- software libraries and applications
-// for evolutionary biology and genomics.
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// cladinator -- clades within clades of annotated labels
 // Copyright (C) 2026 Christian M. Zmasek
 // All rights reserved
 //
@@ -48,7 +49,7 @@ public final class cladinator {
     final static private String PRG_DATE = "2026-04-01";
     final static private String PRG_DESC = "clades within clades of annotated labels -- analysis of pplacer-type outputs";
     final static private String E_MAIL = "czmasek@jcvi.org";
-    final static private String WWW = "https://github.com/cmzmasek/forester";
+    final static private String WWW = "https://github.com/cmzmasek/cladinator";
     final static private String HELP_OPTION_1 = "help";
     final static private String HELP_OPTION_2 = "h";
     final static private String SEP_OPTION = "s";

@@ -1,5 +1,6 @@
-// forester -- software libraries and applications
-// for evolutionary biology and genomics.
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// cladinator -- clades within clades of annotated labels
 // Copyright (C) 2026 Christian M. Zmasek
 // All rights reserved
 //
