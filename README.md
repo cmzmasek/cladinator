@@ -12,6 +12,14 @@ belongs to, the confidence of that assignment, the bracketing clades, and a
 conclusion such as "member of clade A.1" or "potential for novel sub-species
 within clade A".
 
+The reference tree must be rooted, with an outgroup: which clade lies
+"above" a placement depends on the root. Every reference leaf needs a
+hierarchical label (a leaf without one, e.g. an outgroup named `OUT`, turns
+every clade that contains it into "no common label"). A conclusion of
+"member of clade X" needs at least two reference leaves labeled `X` around
+the query, so clades represented by a single leaf can only ever give
+"potential for novel sub-species" (see the note on single leaves below).
+
 cladinator was previously part of
 [forester](https://github.com/cmzmasek/forester) and uses `forester.jar` for
 reading and writing trees.
@@ -83,15 +91,18 @@ column names, then one row per query and tree:
 |---|---|
 | `Tree #` | number of the tree in the input file |
 | `Query` | query name, i.e. the node name before the query pattern (with `-sq`, a name such as `S1_S2` gives one row per part) |
-| `Assignment` | the clade assigned; `X-like` when only one of the bracketing clades is known; empty when there is no assignment |
-| `Confidence` | summed placement confidence of the assignment (or of the best match) |
-| `Brackets` | the down- and up-tree bracketing clades, for a single placement |
+| `Assignment` | the most specific clade whose summed placement confidence reaches the cutoff; empty when there is none |
+| `Confidence` | summed placement confidence of the assignment; without one, of what the conclusion is about |
+| `Brackets` | the down-tree (sister) and up-tree clades, for a single placement |
 | `Conclusion` | see below |
+| `Support` | summed placement confidence of the placements that support the conclusion |
 | `Placement count` | number of placements of the query in the tree |
+| `Pendant length` | the query's branch length, averaged over the placements by confidence (empty without branch lengths) |
+| `Reference depth` | distance from the root to the farthest reference leaf (empty without branch lengths) |
 | `Clade confidences` | every clade prefix with its summed confidence, e.g. `A:1.0;A.1:0.9;A.2:0.1`; the basis of the assignment |
 | `Down-tree confidences` | the same for the down-tree bracketing clades (the query's sister clades) |
 | `Up-tree confidences` | the same for the up-tree bracketing clades |
-| `Warnings` | e.g. `placement confidences add up to 0.99 instead of 1, rescaled to 1` |
+| `Warnings` | problems with the input, and notes on the conclusion (see below) |
 
 Placement confidences (pplacer's likelihood weight ratios, `M=`) are expected
 to add up to 1 for a query, and are always rescaled to exactly 1 before the
@@ -99,14 +110,50 @@ analysis. Placement programs can drop low-weight placements without rescaling
 the rest; if the sum differs from 1 by more than 0.0001, the row says so in
 `Warnings`.
 
-A clade is assigned when it reaches a summed confidence of at least the
-cutoff (`-c`, default 0.7). Possible conclusions:
+### How the conclusion is drawn
+
+Each placement of the query lies in a clade (the label shared by all
+reference leaves around the placement edge), sister to the clade below the
+edge, with the rest of the clade above it. The summed confidence of a clade
+is the confidence of all placements within it.
+
+The **assignment** is the most specific clade whose summed confidence
+reaches the cutoff (`-c`, default 0.7): starting from the top-level clade
+with the highest confidence, the walk goes down to the best-supported
+sub-clade that reaches the cutoff, and stops when two sub-clades tie (noted
+in `Warnings`) or none reaches it.
+
+The **conclusion** at the assigned clade X comes from the placements within
+X. A placement between labeled sub-clades of X (sister clade and up-tree
+clade with different labels, e.g. `A.1` and `A.2`) points to a novel
+sub-species within X; a placement among leaves of one label, or within a
+sub-clade of X, is that of a member of X. The conclusion is the one with
+more confidence, reported in `Support`:
 
 - `member of clade X`
 - `potential for novel sub-species within clade X`
-- `potential for novel sub-species similar to clade X`
-- `potential for novel sub-species` (e.g. all placements on the root)
-- `no confident assignment (best match: clade X)`: no clade reaches the cutoff
+
+If no clade reaches the cutoff but the placements outside all labeled clades
+do (e.g. the query attaches next to the root, or sister to a whole clade):
+
+- `outside all clades, sister to clade X`: the sister clade X reaches the cutoff
+- `outside all clades`
+
+Otherwise:
+
+- `no confident assignment (best match: clade X 0.6)`, or with a tie
+  `no confident assignment (tie: clade A 0.5, clade B 0.5)`
+
+Notes in `Warnings`:
+
+- `sister to a single reference leaf (A.1.1: 0.9): membership in A.1.1 cannot
+  be excluded`: a query that belongs to the taxon of a single reference leaf
+  is placed sister to that leaf, exactly like a novel lineage would be; the
+  topology cannot tell the two apart. `Pendant length` compared with
+  `Reference depth` can: a member has a short pendant branch.
+- `sub-clades of A tie at the cutoff: A.1 0.5, A.2 0.5`
+- `the root has 3 children (unrooted tree?): the up-tree brackets depend on
+  the root`
 
 Problems with a tree are reported in its row, and the other trees are
 still analyzed:
@@ -149,6 +196,21 @@ java -cp dist/cladinator.jar org.cladinator.cladinator_tree_prepare <in-tree> <o
   result rows and error rows alike.
 - New options `-c` (confidence cutoff, was fixed at 0.7) and `-nh`
   (non-homologous query factor, was fixed at 2; `0` turns the check off).
+- The assignment is now the most specific clade that reaches the cutoff
+  (0.9 in `A.1` and 0.1 elsewhere in `A` gave `A 1.0`, now `A.1 0.9`).
+- A query sister to a whole clade `A` was reported as "within clade A"; it
+  is now `outside all clades, sister to clade A`. Several placements between
+  the sub-clades of `A` gave "member of clade A" while one gave "potential
+  for novel sub-species within clade A"; both now give the latter.
+- The `X-like` assignment and the conclusions "similar to clade X" and
+  "potential for novel sub-species" (without a clade) are gone; those cases
+  are `outside all clades` or `no confident assignment`.
+- Ties are named (`no confident assignment (tie: clade A 0.5, clade B 0.5)`)
+  instead of resolved alphabetically.
+- New columns `Support`, `Pendant length` and `Reference depth`; notes on
+  single-leaf sister clades, sub-clade ties, and unrooted trees in
+  `Warnings`.
+- The clade analysis for a query given by name (`AnalysisSingle`) is gone.
 - The table starts with `#` lines recording the version and settings of the
   run, and has three new columns with the full clade, down-tree and up-tree
   confidence distributions.
