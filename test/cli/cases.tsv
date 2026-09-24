@@ -7,3 +7,5 @@ t06_sep_us	t06_sep_us.nwk	-s=_
 t08_underscore_query	t08_underscore_query.nwk	
 t09_long_branch	t09_long_branch.nwk	
 t11_sep_pipe	t11_sep_pipe.nwk	-s=|
+t12_many_prefixes	t12_many_prefixes.nwk	
+t13_split_a_b	t13_split_a_b.nwk	

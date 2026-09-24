@@ -361,10 +361,10 @@ public final class cladinator {
                 if (split_query) {
                     final String[] queries = res.getQueryNamePrefix().split("_");
                     for (final String query : queries) {
-                        printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), w);
+                        printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, w);
                     }
                 } else {
-                    printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), w);
+                    printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, w);
                 }
                 done = true;
                 break;
@@ -377,10 +377,10 @@ public final class cladinator {
                         if (split_query) {
                             final String[] queries = res.getQueryNamePrefix().split("_");
                             for (final String query : queries) {
-                                printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), w);
+                                printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, w);
                             }
                         } else {
-                            printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), w);
+                            printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, w);
                         }
                         done = true;
                         break;
@@ -395,10 +395,10 @@ public final class cladinator {
                         if (split_query) {
                             final String[] queries = res.getQueryNamePrefix().split("_");
                             for (final String query : queries) {
-                                printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), w);
+                                printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, w);
                             }
                         } else {
-                            printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), w);
+                            printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, w);
                         }
                         done = true;
                         break;
@@ -413,11 +413,11 @@ public final class cladinator {
 
                     final Prefix r = res.getAllMultiHitPrefixes().get(0);
 
-                    printRow(counter, query, r.getPrefix(), r.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, res.getNumberOfMatches(), w);
+                    printRow(counter, query, r.getPrefix(), r.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, res.getNumberOfMatches(), false, w);
                 }
             } else {
                 final Prefix r = res.getAllMultiHitPrefixes().get(0);
-                printRow(counter, res.getQueryNamePrefix(), r.getPrefix(), r.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, res.getNumberOfMatches(), w);
+                printRow(counter, res.getQueryNamePrefix(), r.getPrefix(), r.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, res.getNumberOfMatches(), false, w);
             }
         }
         w.write("\n");
@@ -429,7 +429,7 @@ public final class cladinator {
         w.write("\n");
     }
 
-    private static void printRow(final int counter, final String query, final String match, final double confidence, final String prefix_down, final String prefix_up, final int placements, final BufferedWriter w) throws IOException {
+    private static void printRow(final int counter, final String query, final String match, final double confidence, final String prefix_down, final String prefix_up, final int placements, final boolean confident, final BufferedWriter w) throws IOException {
         w.write(String.valueOf(counter));
         w.write("\t");
         w.write(query);
@@ -467,6 +467,8 @@ public final class cladinator {
             } else {
                 w.write("potential for novel sub-species within clade " + match);
             }
+        } else if (!confident && !match.equals(AnalysisMulti.UNKNOWN)) {
+            w.write("no confident assignment (best match: clade " + match + ")");
         } else if (match.equals(AnalysisMulti.UNKNOWN)) {
             w.write("potential for novel sub-species");
         } else {
