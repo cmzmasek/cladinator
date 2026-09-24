@@ -33,9 +33,15 @@ reading and writing trees.
 
 ```
 ant          # builds dist/cladinator.jar and copies forester.jar next to it
-ant test     # runs the test suite
+ant test     # runs the JUnit tests and the command-line tests
 ant clean
 ```
+
+`ant test` downloads JUnit's console launcher into `lib/` the first time
+(its checksum is verified). The command-line tests in `test/cli/` run
+`dist/cladinator.jar` on the trees in `test/data/` and compare the tables
+with `test/cli/expected/`; `test/cli_test.sh --update` rewrites those after
+an intended change.
 
 `dist/cladinator.jar` finds `forester.jar` in the same directory, so keep
 the two files together.
@@ -77,6 +83,9 @@ Notes on options:
   `,`, `;`, `(`, `)`, `[`, `]`), because the tree cannot be read then.
 - `-rs` only changes how names are printed, not the analysis. It can make
   different clades look the same: `A.1.1` and `A.11` both print as `A11`.
+- A reference leaf without a hierarchical label (an outgroup inside the
+  ingroup, a leaf missing from the mapping) makes every clade containing it
+  "no common label"; such leaves are reported in `Warnings`.
 - An existing output file is not overwritten; the program stops with
   `[...] already exists`.
 
@@ -181,6 +190,10 @@ Notes in `Warnings`:
 - `sub-clades of A tie at the cutoff: A.1 0.5, A.2 0.5`
 - `the root has 3 children (unrooted tree?): the up-tree brackets depend on
   the root`
+- `only one reference leaf in top-level clade OUTGROUP ("OUTGROUP"): no
+  clade containing it has a common label (outgroup? unlabeled leaf?)`: a
+  leaf whose top-level label is unique in the tree, unless it is attached to
+  the root as an outgroup
 
 Problems with a tree are reported in its row, and the other trees are
 still analyzed:
@@ -211,6 +224,13 @@ java -cp dist/cladinator.jar org.cladinator.cladinator_tree_prepare <in-tree> <o
 ```
 
 ## Changes
+
+**3.3.1** (2026-09-24)
+
+- A top-level clade with a single reference leaf is reported in `Warnings`,
+  since no clade containing that leaf has a common label (an outgroup
+  attached to the root is not reported).
+- The tests use JUnit.
 
 **3.3.0** (2026-09-24)
 
