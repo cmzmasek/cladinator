@@ -22,6 +22,8 @@
 package org.cladinator;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.regex.Matcher;
@@ -104,6 +106,12 @@ public final class AnalysisMulti {
         if (p.getRoot().getNumberOfDescendants() > 2) {
             res.addWarning("the root has " + p.getRoot().getNumberOfDescendants()
                     + " children (unrooted tree?): the up-tree brackets depend on the root");
+        }
+        final List<String> lonely = leavesWithUniqueTopLevelLabel(p, query, separator);
+        if (!lonely.isEmpty()) {
+            res.addWarning("only one reference leaf in top-level clade" + (lonely.size() == 1 ? " " : "s ")
+                    + String.join(", ", lonely) + ": no clade containing "
+                    + (lonely.size() == 1 ? "it" : "them") + " has a common label (outgroup? unlabeled leaf?)");
         }
         for (int i = 0; i < qnodes.size(); ++i) {
             final PhylogenyNode qnode = qnodes.get(i);
@@ -262,6 +270,43 @@ public final class AnalysisMulti {
             }
             node.setName(name.replaceAll("\\s+", " "));
         }
+    }
+
+    /**
+     * Reference leaves whose top-level label (the part before the first separator) no other reference leaf has,
+     * except leaves attached to the root (an outgroup). Such a leaf leaves every clade containing it without a
+     * common label. At most 5 are listed.
+     */
+    private static List<String> leavesWithUniqueTopLevelLabel(final Phylogeny p, final Pattern query, final String separator) {
+        final Map<String, Integer> counts = new HashMap<>();
+        final List<PhylogenyNode> leaves = new ArrayList<>();
+        for (final PhylogenyNodeIterator it = p.iteratorExternalForward(); it.hasNext(); ) {
+            final PhylogenyNode n = it.next();
+            if (!query.matcher(n.getName()).find()) {
+                leaves.add(n);
+                counts.merge(topLevel(n.getName(), separator), 1, Integer::sum);
+            }
+        }
+        final List<String> lonely = new ArrayList<>();
+        int more = 0;
+        for (final PhylogenyNode n : leaves) {
+            if ((counts.get(topLevel(n.getName(), separator)) == 1) && !n.getParent().isRoot()) {
+                if (lonely.size() < 5) {
+                    lonely.add(topLevel(n.getName(), separator) + " (\"" + n.getName() + "\")");
+                } else {
+                    ++more;
+                }
+            }
+        }
+        if (more > 0) {
+            lonely.add("and " + more + " more");
+        }
+        return lonely;
+    }
+
+    private static String topLevel(final String label, final String separator) {
+        final int i = label.indexOf(separator);
+        return (i < 0) ? label : label.substring(0, i);
     }
 
     /** The number of reference leaves in the sister clade(s) of child under parent. */
