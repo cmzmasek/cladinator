@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.function.UnaryOperator;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -276,50 +277,20 @@ public final class cladinator {
             describeColumns(print_writer);
             for (final Phylogeny phy : phys) {
                 ++counter;
-                if (map != null) {
-                    AnalysisMulti.performMapping(pattern, map, phy, true);
-                }
-                if (extra_processing1) {
-                    AnalysisMulti.performExtraProcessing1(pattern, phy, extra_processing1_sep, extra_processing1_keep, separator, true);
-                } else if (special_processing) {
-                    AnalysisMulti.performSpecialProcessing1(pattern, phy, separator, special_pattern, true);
-                }
-
-                final List<PhylogenyNode> query_nodes = phy.getNodes(pattern); // null for an empty tree
-                if ((query_nodes == null) || query_nodes.isEmpty()) {
-                    final String message = "Input error: no query found (query pattern: " + pattern + ")";
+                try {
+                    analyzeTree(phy, counter, pattern, separator, map, extra_processing1, extra_processing1_sep,
+                            extra_processing1_keep, special_processing, special_pattern, label, outtable_writer,
+                            print_writer);
+                } catch (final UserException e) {
+                    // A problem with this tree only: report it in its row and go on with the next tree.
+                    final String message = "Input error: " + e.getMessage();
+                    final String q = queryNamePrefix(phy, pattern);
+                    final int placements = numberOfQueryNodes(phy, pattern);
                     if (outtable_writer != null) {
-                        inputErrorRow(counter, "", message, 0, outtable_writer);
+                        inputErrorRow(counter, q, message, placements, outtable_writer);
                     }
-                    inputErrorRow(counter, "", message, 0, print_writer);
-                    continue;
+                    inputErrorRow(counter, q, message, placements, print_writer);
                 }
-
-                if (AnalysisMulti.likelyProblematicQuery(phy, pattern, 2)) {
-                    int placements = 0;
-                    String q = "";
-                    try {
-                        final List<PhylogenyNode> nodes = phy.getNodes(pattern);
-                        if (nodes != null && nodes.size() > 0) {
-                            placements = nodes.size();
-                            q = nodes.get(0).getName().split("_")[0];
-                        }
-                    } catch (final Exception e) {
-                        // Eat exception
-                    }
-                    if (outtable_writer != null) {
-                        inputErrorRow(counter, q, NON_HOMOLOGOUS_QUERY_MESSAGE, placements, outtable_writer);
-                    }
-                    inputErrorRow(counter, q, NON_HOMOLOGOUS_QUERY_MESSAGE, placements, print_writer);
-                    continue;
-                }
-
-                final ResultMulti res = AnalysisMulti.execute(phy, pattern, separator);
-
-                if (outtable_writer != null) {
-                    printResult(res, counter, pattern, label, outtable_writer);
-                }
-                printResult(res, counter, pattern, label, print_writer);
                 print_writer.flush();
             }
             if (outtable_writer != null) {
@@ -328,14 +299,87 @@ public final class cladinator {
             }
             print_writer.flush();
             print_writer.close();
-        } catch (final UserException e) {
-            ForesterUtil.fatalError(PRG_NAME, e.getMessage());
         } catch (final IOException e) {
             ForesterUtil.fatalError(PRG_NAME, e.getMessage());
         } catch (final Exception e) {
             e.printStackTrace();
             ForesterUtil.fatalError(PRG_NAME, "Unexpected error!");
         }
+    }
+
+    private static void analyzeTree(final Phylogeny phy,
+                                    final int counter,
+                                    final Pattern pattern,
+                                    final String separator,
+                                    final SortedMap<String, String> map,
+                                    final boolean extra_processing1,
+                                    final String extra_processing1_sep,
+                                    final boolean extra_processing1_keep,
+                                    final boolean special_processing,
+                                    final Pattern special_pattern,
+                                    final UnaryOperator<String> label,
+                                    final EasyWriter outtable_writer,
+                                    final BufferedWriter print_writer) throws UserException, IOException {
+        if (map != null) {
+            AnalysisMulti.performMapping(pattern, map, phy, true);
+        }
+        if (extra_processing1) {
+            AnalysisMulti.performExtraProcessing1(pattern, phy, extra_processing1_sep, extra_processing1_keep, separator, true);
+        } else if (special_processing) {
+            AnalysisMulti.performSpecialProcessing1(pattern, phy, separator, special_pattern, true);
+        }
+
+        final List<PhylogenyNode> query_nodes = phy.getNodes(pattern); // null for an empty tree
+        if ((query_nodes == null) || query_nodes.isEmpty()) {
+            final String message = "Input error: no query found (query pattern: " + pattern + ")";
+            if (outtable_writer != null) {
+                inputErrorRow(counter, "", message, 0, outtable_writer);
+            }
+            inputErrorRow(counter, "", message, 0, print_writer);
+            return;
+        }
+
+        if (AnalysisMulti.likelyProblematicQuery(phy, pattern, 2)) {
+            int placements = 0;
+            String q = "";
+            try {
+                final List<PhylogenyNode> nodes = phy.getNodes(pattern);
+                if (nodes != null && nodes.size() > 0) {
+                    placements = nodes.size();
+                    q = nodes.get(0).getName().split("_")[0];
+                }
+            } catch (final Exception e) {
+                // Eat exception
+            }
+            if (outtable_writer != null) {
+                inputErrorRow(counter, q, NON_HOMOLOGOUS_QUERY_MESSAGE, placements, outtable_writer);
+            }
+            inputErrorRow(counter, q, NON_HOMOLOGOUS_QUERY_MESSAGE, placements, print_writer);
+            return;
+        }
+
+        final ResultMulti res = AnalysisMulti.execute(phy, pattern, separator);
+
+        if (outtable_writer != null) {
+            printResult(res, counter, pattern, label, outtable_writer);
+        }
+        printResult(res, counter, pattern, label, print_writer);
+    }
+
+    /** The query name, i.e. the part of the first query node's name before the query pattern; "" if none. */
+    private static String queryNamePrefix(final Phylogeny phy, final Pattern pattern) {
+        final List<PhylogenyNode> nodes = phy.getNodes(pattern);
+        if ((nodes == null) || nodes.isEmpty()) {
+            return "";
+        }
+        final String name = nodes.get(0).getName();
+        final Matcher m = pattern.matcher(name);
+        return m.find() ? name.substring(0, m.start()) : name;
+    }
+
+    private static int numberOfQueryNodes(final Phylogeny phy, final Pattern pattern) {
+        final List<PhylogenyNode> nodes = phy.getNodes(pattern);
+        return (nodes == null) ? 0 : nodes.size();
     }
 
     private static void inputErrorRow(final int counter, final String query, final String message, final int placements, final BufferedWriter w) throws IOException {
@@ -352,6 +396,8 @@ public final class cladinator {
         w.write(message);
         w.write("\t");
         w.write(String.valueOf(placements));
+        w.write("\t");
+        w.write("");
         w.write("\n");
         w.flush();
     }
@@ -376,10 +422,10 @@ public final class cladinator {
                 if (split_query) {
                     final String[] queries = res.getQueryNamePrefix().split("_");
                     for (final String query : queries) {
-                        printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, w);
+                        printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res.getWarnings(), w);
                     }
                 } else {
-                    printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, w);
+                    printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res.getWarnings(), w);
                 }
                 done = true;
                 break;
@@ -392,10 +438,10 @@ public final class cladinator {
                         if (split_query) {
                             final String[] queries = res.getQueryNamePrefix().split("_");
                             for (final String query : queries) {
-                                printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, w);
+                                printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res.getWarnings(), w);
                             }
                         } else {
-                            printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, w);
+                            printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res.getWarnings(), w);
                         }
                         done = true;
                         break;
@@ -410,10 +456,10 @@ public final class cladinator {
                         if (split_query) {
                             final String[] queries = res.getQueryNamePrefix().split("_");
                             for (final String query : queries) {
-                                printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, w);
+                                printRow(counter, query, prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res.getWarnings(), w);
                             }
                         } else {
-                            printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, w);
+                            printRow(counter, res.getQueryNamePrefix(), prefix.getPrefix(), prefix.getConfidence(), res.getAllMultiHitPrefixesDown().get(0).getPrefix(), res.getAllMultiHitPrefixesUp().get(0).getPrefix(), res.getNumberOfMatches(), true, label, res.getWarnings(), w);
                         }
                         done = true;
                         break;
@@ -428,22 +474,22 @@ public final class cladinator {
 
                     final Prefix r = res.getAllMultiHitPrefixes().get(0);
 
-                    printRow(counter, query, r.getPrefix(), r.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, res.getNumberOfMatches(), false, label, w);
+                    printRow(counter, query, r.getPrefix(), r.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, res.getNumberOfMatches(), false, label, res.getWarnings(), w);
                 }
             } else {
                 final Prefix r = res.getAllMultiHitPrefixes().get(0);
-                printRow(counter, res.getQueryNamePrefix(), r.getPrefix(), r.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, res.getNumberOfMatches(), false, label, w);
+                printRow(counter, res.getQueryNamePrefix(), r.getPrefix(), r.getConfidence(), AnalysisMulti.UNKNOWN, AnalysisMulti.UNKNOWN, res.getNumberOfMatches(), false, label, res.getWarnings(), w);
             }
         }
         w.flush();
     }
 
     private static void describeColumns(BufferedWriter w) throws IOException {
-        w.write("#Tree #\tQuery\tAssignment\tConfidence\tBrackets\tConclusion\tPlacement count");
+        w.write("#Tree #\tQuery\tAssignment\tConfidence\tBrackets\tConclusion\tPlacement count\tWarnings");
         w.write("\n");
     }
 
-    private static void printRow(final int counter, final String query, final String match, final double confidence, final String prefix_down, final String prefix_up, final int placements, final boolean confident, final UnaryOperator<String> label, final BufferedWriter w) throws IOException {
+    private static void printRow(final int counter, final String query, final String match, final double confidence, final String prefix_down, final String prefix_up, final int placements, final boolean confident, final UnaryOperator<String> label, final List<String> warnings, final BufferedWriter w) throws IOException {
         final String m = label.apply(match);
         final String d = label.apply(prefix_down);
         final String u = label.apply(prefix_up);
@@ -494,6 +540,8 @@ public final class cladinator {
 
         w.write("\t");
         w.write(String.valueOf(placements));
+        w.write("\t");
+        w.write(String.join("; ", warnings));
         w.write("\n");
         w.flush();
     }

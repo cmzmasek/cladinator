@@ -21,6 +21,7 @@
 
 package org.cladinator;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.SortedMap;
@@ -39,6 +40,9 @@ public final class AnalysisMulti {
     public final static String UNKNOWN = "?";
     public final static String DEFAULT_SEPARATOR = ".";
     public final static Pattern DEFAULT_QUERY_PATTERN_FOR_PPLACER_TYPE = Pattern.compile("_#\\d+_M=(.+)");
+    /** Placement confidences whose sum is further than this from 1 are rescaled with a warning. */
+    public final static double CONFIDENCE_SUM_TOLERANCE = 1E-4;
+    private final static DecimalFormat CONF_FORMAT = new DecimalFormat("0.0###");
 
     public static ResultMulti execute(final Phylogeny p) throws UserException {
         return execute(p, DEFAULT_QUERY_PATTERN_FOR_PPLACER_TYPE, DEFAULT_SEPARATOR);
@@ -96,14 +100,15 @@ public final class AnalysisMulti {
         res.setQueryNamePrefix(obtainQueryPrefix(query, qnodes));
         res.setTotalNumberOfMatches(qnodes.size());
         res.setReferenceTreeNumberOfExternalNodes(p.getNumberOfExternalNodes() - qnodes.size());
+        final double[] confs = normalizedConfidences(query, qnodes, res);
         for (int i = 0; i < qnodes.size(); ++i) {
             final PhylogenyNode qnode = qnodes.get(i);
+            final double conf = confs[i];
             if (qnode.isRoot()) {
                 throw new UserException("ERROR: query \"" + query + "\" is root");
             }
             if (qnode.getParent().isRoot()) {
                 // No bracketing clades either; up/down need the entry too, or their confidences do not add up to 1.
-                final double conf = parseConfidence(query, qnode);
                 res.addGreatestCommonPrefix(UNKNOWN, conf);
                 res.addGreatestCommonPrefixUp(UNKNOWN, conf);
                 res.addGreatestCommonPrefixDown(UNKNOWN, conf);
@@ -127,7 +132,6 @@ public final class AnalysisMulti {
                 }
             }
             final String greatest_common_prefix = ForesterUtil.greatestCommonPrefix(qnode_ext_nodes_names, separator);
-            final double conf = parseConfidence(query, qnode);
             if (!ForesterUtil.isEmpty(greatest_common_prefix)) {
                 res.addGreatestCommonPrefix(greatest_common_prefix, conf);
             } else {
@@ -148,6 +152,41 @@ public final class AnalysisMulti {
         }
         res.analyze();
         return res;
+    }
+
+    /**
+     * The placement confidences (e.g. pplacer likelihood weight ratios) of the query nodes, scaled so that they
+     * add up to 1. Placement programs can drop low-weight placements without rescaling the rest; if the sum
+     * deviates from 1 by more than {@link #CONFIDENCE_SUM_TOLERANCE}, a warning is added to the result.
+     */
+    private static double[] normalizedConfidences(final Pattern query,
+                                                  final List<PhylogenyNode> qnodes,
+                                                  final ResultMulti res) throws UserException {
+        final double[] confs = new double[qnodes.size()];
+        double sum = 0.0;
+        for (int i = 0; i < qnodes.size(); ++i) {
+            confs[i] = parseConfidence(query, qnodes.get(i));
+            if (confs[i] < 0.0) {
+                throw new UserException("ERROR: negative placement confidence in query node name \""
+                        + qnodes.get(i).getName() + "\"");
+            }
+            sum += confs[i];
+        }
+        if (qnodes.isEmpty()) {
+            return confs;
+        }
+        if (sum <= 0.0) {
+            throw new UserException("ERROR: placement confidences of query \"" + res.getQueryNamePrefix()
+                    + "\" add up to 0");
+        }
+        if (Math.abs(sum - 1.0) > CONFIDENCE_SUM_TOLERANCE) {
+            res.addWarning("placement confidences add up to " + CONF_FORMAT.format(sum)
+                    + " instead of 1, rescaled to 1");
+        }
+        for (int i = 0; i < confs.length; ++i) {
+            confs[i] /= sum;
+        }
+        return confs;
     }
 
     private static double parseConfidence(final Pattern query, final PhylogenyNode n) throws UserException {

@@ -49,6 +49,7 @@ public final class ResultMulti {
     private int _matches = 0;
     private int _ref_tree_ext_nodes = 0;
     private String _query_name_prefix = "";
+    private final List<String> _warnings = new ArrayList<String>();
     private final static DecimalFormat df = new DecimalFormat("0.0###");
 
     ResultMulti(final String separator) {
@@ -101,6 +102,15 @@ public final class ResultMulti {
         return _ref_tree_ext_nodes;
     }
 
+    /** Problems with the input that did not prevent the analysis (e.g. rescaled confidences); empty if none. */
+    public List<String> getWarnings() {
+        return _warnings;
+    }
+
+    void addWarning(final String warning) {
+        _warnings.add(warning);
+    }
+
 
     @Override
     public String toString() {
@@ -136,6 +146,10 @@ public final class ResultMulti {
         sb.append(ForesterUtil.LINE_SEPARATOR);
         sb.append("Total Number of Matches: " + getNumberOfMatches() + "/" + getReferenceTreeNumberOfExternalNodes());
         sb.append(ForesterUtil.LINE_SEPARATOR);
+        for (final String warning : _warnings) {
+            sb.append("Warning: " + warning);
+            sb.append(ForesterUtil.LINE_SEPARATOR);
+        }
         return sb.toString();
     }
 
@@ -238,7 +252,8 @@ public final class ResultMulti {
             }
         }
         if (!ForesterUtil.isEqual(confidence_sum, 1.0, MIN_DIFF)) {
-            throw new UserException("ERROR: confidences add up to " + confidence_sum + " instead of 1.0");
+            // AnalysisMulti rescales the placement confidences to 1 before they get here.
+            throw new IllegalStateException("confidences add up to " + confidence_sum + " instead of 1.0");
         }
         return collapsed;
     }

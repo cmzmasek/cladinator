@@ -28,6 +28,7 @@ import org.forester.phylogeny.Phylogeny;
 import org.forester.phylogeny.factories.ParserBasedPhylogenyFactory;
 import org.forester.phylogeny.factories.PhylogenyFactory;
 import org.forester.util.ForesterUtil;
+import org.forester.util.UserException;
 
 import java.io.File;
 import java.util.List;
@@ -80,6 +81,10 @@ public class CladeAnalysisTest {
             System.out.println("Likely problematic query failed");
             failed = true;
         }
+        if (!testConfidenceRenormalization()) {
+            System.out.println("Confidence renormalization failed");
+            failed = true;
+        }
         if (!failed) {
             System.out.println("OK");
         } else {
@@ -111,6 +116,9 @@ public class CladeAnalysisTest {
             return false;
         }
         if (!testLikelyProblematicQuery()) {
+            return false;
+        }
+        if (!testConfidenceRenormalization()) {
             return false;
         }
         return true;
@@ -967,6 +975,44 @@ public class CladeAnalysisTest {
             }
             if (AnalysisMulti.likelyProblematicQuery(factory.create(only_queries, new NHXParser())[0], q, 2)) {
                 return false;
+            }
+        } catch (final Exception e) {
+            e.printStackTrace(System.out);
+            return false;
+        }
+        return true;
+    }
+
+    // Placement confidences that do not add up to 1 (placement programs drop low-weight placements) are
+    // rescaled, with a warning; a sum of 0 is an error.
+    private static boolean testConfidenceRenormalization() {
+        try {
+            final PhylogenyFactory factory = ParserBasedPhylogenyFactory.getInstance();
+            final String t = "((((A.1.1,A.1.2),Q_#1_M=0.95),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.04),B.2.1))";
+            final ResultMulti res = AnalysisMulti.execute(factory.create(t, new NHXParser())[0], ".");
+            if (!isPrefixes(res.getAllMultiHitPrefixes(), "A", 0.95 / 0.99, "B", 0.04 / 0.99)) {
+                return false;
+            }
+            if (res.getWarnings().size() != 1 || !res.getWarnings().get(0).contains("0.99")) {
+                return false;
+            }
+            final String exact = "((((A.1.1,A.1.2),Q_#1_M=0.96),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.04),B.2.1))";
+            final ResultMulti res2 = AnalysisMulti.execute(factory.create(exact, new NHXParser())[0], ".");
+            if (!res2.getWarnings().isEmpty()) {
+                return false;
+            }
+            // within tolerance (real pplacer output is printed with ~6 digits): no warning
+            final String near = "((((A.1.1,A.1.2),Q_#1_M=0.959999),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.04),B.2.1))";
+            final ResultMulti res3 = AnalysisMulti.execute(factory.create(near, new NHXParser())[0], ".");
+            if (!res3.getWarnings().isEmpty()) {
+                return false;
+            }
+            final String zero = "((((A.1.1,A.1.2),Q_#1_M=0),(A.2.1,A.2.2)),((B.1.1,Q_#2_M=0.0),B.2.1))";
+            try {
+                AnalysisMulti.execute(factory.create(zero, new NHXParser())[0], ".");
+                return false;
+            } catch (final UserException expected) {
+                // ok
             }
         } catch (final Exception e) {
             e.printStackTrace(System.out);
