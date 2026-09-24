@@ -65,6 +65,7 @@ public final class cladinator {
     final static private String EXTRA_PROCESSING1_SEP_DEFAULT = "|";
     final static private boolean EXTRA_PROCESSING1_KEEP_EXTRA_DEFAULT = false;
     private final static DecimalFormat df = new DecimalFormat("0.0###");
+    final static private String NON_HOMOLOGOUS_QUERY_MESSAGE = "Input sequence error: Likely non-homologous query sequence";
 
 
     public static void main(final String args[]) {
@@ -280,6 +281,16 @@ public final class cladinator {
                     AnalysisMulti.performSpecialProcessing1(pattern, phy, separator, special_pattern, true);
                 }
 
+                final List<PhylogenyNode> query_nodes = phy.getNodes(pattern); // null for an empty tree
+                if ((query_nodes == null) || query_nodes.isEmpty()) {
+                    final String message = "Input error: no query found (query pattern: " + pattern + ")";
+                    if (outtable_writer != null) {
+                        inputErrorRow(counter, "", message, 0, outtable_writer);
+                    }
+                    inputErrorRow(counter, "", message, 0, print_writer);
+                    continue;
+                }
+
                 if (AnalysisMulti.likelyProblematicQuery(phy, pattern, 2)) {
                     int placements = 0;
                     String q = "";
@@ -293,9 +304,9 @@ public final class cladinator {
                         // Eat exception
                     }
                     if (outtable_writer != null) {
-                        nonHomologousQueryError(counter, q, placements, outtable_writer);
+                        inputErrorRow(counter, q, NON_HOMOLOGOUS_QUERY_MESSAGE, placements, outtable_writer);
                     }
-                    nonHomologousQueryError(counter, q, placements, print_writer);
+                    inputErrorRow(counter, q, NON_HOMOLOGOUS_QUERY_MESSAGE, placements, print_writer);
                     continue;
                 }
 
@@ -323,7 +334,7 @@ public final class cladinator {
         }
     }
 
-    private static void nonHomologousQueryError(final int counter, final String query, final int placements, final BufferedWriter w) throws IOException {
+    private static void inputErrorRow(final int counter, final String query, final String message, final int placements, final BufferedWriter w) throws IOException {
         w.write(String.valueOf(counter));
         w.write("\t");
         w.write(query);
@@ -334,7 +345,7 @@ public final class cladinator {
         w.write("\t");
         w.write("");
         w.write("\t");
-        w.write("Input sequence error: Likely non-homologous query sequence");
+        w.write(message);
         w.write("\t");
         w.write(String.valueOf(placements));
         w.write("\n");
