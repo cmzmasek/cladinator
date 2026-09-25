@@ -46,6 +46,14 @@ an intended change.
 `dist/cladinator.jar` finds `forester.jar` in the same directory, so keep
 the two files together.
 
+`lib/forester.jar` is forester 0.11.159, built with `ant all` in
+`forester/java` at commit
+[`191a3dc9`](https://github.com/cmzmasek/forester/tree/191a3dc9ee2bafc8276ec3290c317d196873ef6d).
+The build checks its checksum against the record in `build.xml`
+(`forester.version`, `forester.commit`, `forester.sha256`); when updating
+the jar, update those three properties and note the new forester version
+under Changes.
+
 ## Usage
 
 ```
@@ -268,6 +276,12 @@ java -cp dist/cladinator.jar org.cladinator.cladinator_tree_prepare <in-tree> <o
 
 ## Changes
 
+**Unreleased**
+
+- The forester build that `lib/forester.jar` is (0.11.159, commit
+  `191a3dc9`) is recorded in `build.xml` and here, and the build verifies
+  the jar's checksum against that record.
+
 **3.4.0** (2026-09-24)
 
 - Labels that are not clade annotations (every leaf with a label of its
@@ -349,8 +363,9 @@ the terms of the GNU General Public License as published by the Free
 Software Foundation, either version 3 of the License, or (at your option)
 any later version (SPDX: `GPL-3.0-or-later`). See [LICENSE](LICENSE).
 
-`lib/forester.jar` is [forester](https://github.com/cmzmasek/forester),
-also GPL-3.0-or-later.
+`lib/forester.jar` is [forester](https://github.com/cmzmasek/forester)
+0.11.159, also GPL-3.0-or-later; its source is forester at commit
+[`191a3dc9`](https://github.com/cmzmasek/forester/tree/191a3dc9ee2bafc8276ec3290c317d196873ef6d).
 
 ## Contact
 
