@@ -67,6 +67,7 @@ Options:
 | `-c=<cutoff>` | minimum summed placement confidence for assigning a clade (default: 0.7) |
 | `-nh=<factor>` | a query is reported as likely non-homologous when all its placements are at least `<factor>` times as far from the root as the farthest reference leaf (default: 2, `0` turns the check off) |
 | `-d=<distance>` | decide member vs. novel by distance: a query closer than `<distance>` to a reference leaf is a member of that leaf's clade, one farther from every reference leaf is a novel lineage (default: by topology; see below) |
+| `-dry-run` | the run without the table: shows what is read from each tree after the label processing and what the run would report for it (see below) |
 | `-q=<pattern>` | expert option: regular expression for query names (default: `_#\d+_M=(.+)`) |
 
 Examples:
@@ -76,6 +77,45 @@ java -jar dist/cladinator.jar pp_out_tree.sing.tre result.tsv
 java -jar dist/cladinator.jar -s=_ -m=map.tsv pp_out_trees.sing.tre result.tsv
 java -jar dist/cladinator.jar -x -xk -m=map.tsv pp_out_trees.sing.tre result.tsv
 ```
+
+### Checking the setup
+
+Everything depends on the labels cladinator reads being clade annotations
+that many leaves share. If the mapping file, the separator or the extra
+processing is missing or wrong, the labels it reads are sequence
+identifiers, every leaf has a label of its own, and nothing can be
+classified. Three things guard against that:
+
+- `-dry-run` is the run without the table. For each tree it prints the
+  number of reference leaves, the top-level clades with their leaf counts,
+  the number of label levels, the first labels, the query, and what the run
+  would report for the tree:
+
+  ```
+  Tree 1: 14 reference leaves, 3 top-level clades (A: 12, B: 1, C: 1), 2-4 label levels; query "CED9_CAEBR" with 7 placements
+    labels (first 10): A.1.1.1, A.1.1.2, A.1.1.3, A.1.2.1, A.1.2.2, A.2.1.1, A.3.1.1, A.3.1.1, A.3.2.1, C.5
+    run: OK, potential for novel sub-species within clade A (assignment A)
+  ```
+
+  Every check of a run is made (malformed labels, unparsable confidences,
+  two queries in a tree, ...), and the exit status is non-zero if a tree
+  would get an input error or if no two of its reference leaves share a
+  top-level label. Use it when setting up a new reference.
+- A normal run prints the same summary line (`Reference (tree 1): ...`) on
+  the console, once per reference (again when it changes from one tree to
+  the next).
+- A tree in which no two reference leaves share a top-level label gets the
+  warning `every reference leaf has a label of its own (21 leaves, 21
+  distinct top-level labels, e.g. "NC_012345", "KX887201"): the clade
+  annotations are not being read; check the annotation separator (-s), the
+  mapping file (-m) and the extra processing (-x)` in its row, and a
+  warning on stderr at the end of the run says in how many trees this
+  happened. The tree is still analyzed, because a reference with one
+  sequence per clade looks the same and its results (`outside all clades,
+  sister to clade A`, or a member by distance with `-d`) are meaningful. A
+  tree in which more than half of the leaves have a top-level label of their
+  own gets the milder warning `most reference leaves have a label of their
+  own (13 of 21): ...`.
 
 Notes on options:
 
@@ -190,6 +230,9 @@ Notes in `Warnings`:
 - `sub-clades of A tie at the cutoff: A.1 0.5, A.2 0.5`
 - `the root has 3 children (unrooted tree?): the up-tree brackets depend on
   the root`
+- `every reference leaf has a label of its own (...)` and `most reference
+  leaves have a label of their own (13 of 21): ...` (see "Checking the
+  setup")
 - `only one reference leaf in top-level clade OUTGROUP ("OUTGROUP"): no
   clade containing it has a common label (outgroup? unlabeled leaf?)`: a
   leaf whose top-level label is unique in the tree, unless it is attached to
@@ -224,6 +267,16 @@ java -cp dist/cladinator.jar org.cladinator.cladinator_tree_prepare <in-tree> <o
 ```
 
 ## Changes
+
+**3.4.0** (2026-09-24)
+
+- Labels that are not clade annotations (every leaf with a label of its
+  own, as when `-m`, `-s` or `-x` is missing or wrong) are warned about in
+  every row and on stderr at the end of the run; more than half of the
+  leaves alone gets a milder warning. New option `-dry-run` (the run
+  without the table) shows what is read from the trees and what the run
+  would report, and fails on such labels; a normal run prints the label
+  summary once per reference.
 
 **3.3.1** (2026-09-24)
 
