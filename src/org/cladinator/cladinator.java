@@ -39,6 +39,7 @@ import org.forester.io.parsers.PhylogenyParser;
 import org.forester.io.parsers.util.ParserUtils;
 import org.forester.phylogeny.Phylogeny;
 import org.forester.phylogeny.PhylogenyNode;
+import org.forester.phylogeny.iterators.PhylogenyNodeIterator;
 import org.forester.phylogeny.factories.ParserBasedPhylogenyFactory;
 import org.forester.phylogeny.factories.PhylogenyFactory;
 import org.forester.util.BasicTable;
@@ -70,6 +71,7 @@ public final class cladinator {
     final static private String CUTOFF_OPTION = "c";
     final static private String NON_HOMOLOGOUS_FACTOR_OPTION = "nh";
     final static private String DISTANCE_THRESHOLD_OPTION = "d";
+    final static private String DRY_RUN_OPTION = "dry-run";
     final static private double CUTOFF_DEFAULT = 0.7;
     final static private double NON_HOMOLOGOUS_FACTOR_DEFAULT = 2.0;
     final static private String QUERY_NAME_SPLIT_SEP = "_";
@@ -118,6 +120,7 @@ public final class cladinator {
             allowed_options.add(CUTOFF_OPTION);
             allowed_options.add(NON_HOMOLOGOUS_FACTOR_OPTION);
             allowed_options.add(DISTANCE_THRESHOLD_OPTION);
+            allowed_options.add(DRY_RUN_OPTION);
             final String dissallowed_options = cla.validateAllowedOptionsAsString(allowed_options);
             if (dissallowed_options.length() > 0) {
                 ForesterUtil.fatalError(PRG_NAME, "unknown option(s): " + dissallowed_options);
@@ -255,6 +258,10 @@ public final class cladinator {
                 }
             }
 
+            final boolean dry_run = cla.isOptionSet(DRY_RUN_OPTION);
+            if (dry_run && (cla.getNumberOfNames() > 1)) {
+                ForesterUtil.fatalError(PRG_NAME, "no output table with -" + DRY_RUN_OPTION);
+            }
             Double distance_threshold = null;
             if (cla.isOptionSet(DISTANCE_THRESHOLD_OPTION)) {
                 if (!cla.isOptionValueSet(DISTANCE_THRESHOLD_OPTION)) {
@@ -321,6 +328,9 @@ public final class cladinator {
             if (phys.length == 1) {
                 System.out.println("Ext. nodes in input tree   : " + phys[0].getNumberOfExternalNodes());
             }
+            if (dry_run) {
+                System.exit(dryRun(phys, settings) ? 0 : -1);
+            }
             final List<BufferedWriter> writers = new ArrayList<>();
             final EasyWriter outtable_writer = (outtablefile != null) ? ForesterUtil.createEasyWriter(outtablefile) : null;
             if (outtable_writer != null) {
@@ -360,12 +370,18 @@ public final class cladinator {
             emit(writers, header.toString());
             int counter = 0;
             int input_errors = 0;
+            int none_shared = 0;
+            int most_alone = 0;
             int non_homologous = 0;
+            LabelStatistics previous_stats = null;
             for (final Phylogeny phy : phys) {
                 ++counter;
                 String rows;
+                LabelStatistics stats;
                 try {
-                    rows = analyzeTree(phy, counter, settings);
+                    final TreeOutput out = analyzeTree(phy, counter, settings);
+                    rows = out.rows();
+                    stats = out.stats();
                 } catch (final TreeProblem e) {
                     // A problem with this tree only: report it in its row(s) and go on with the next tree.
                     if (e.input_error) {
@@ -373,9 +389,23 @@ public final class cladinator {
                     } else {
                         ++non_homologous;
                     }
+                    stats = e.stats;
+                    final String warning = ((stats != null) && (stats.problem() != null)) ? stats.problem() : "";
                     rows = "";
                     for (final String query : queryNames(e.query_name, split_query)) {
-                        rows += errorRow(counter, query, e.getMessage(), e.placements);
+                        rows += errorRow(counter, query, e.getMessage(), e.placements, warning);
+                    }
+                }
+                if ((stats != null) && !stats.equals(previous_stats)) {
+                    // what the labels look like, once per reference (the trees of a run usually share it)
+                    System.out.println("Reference (tree " + counter + "): " + stats.summary());
+                    previous_stats = stats;
+                }
+                if (stats != null) {
+                    if (stats.noneShared()) {
+                        ++none_shared;
+                    } else if (stats.mostAlone()) {
+                        ++most_alone;
                     }
                 }
                 emit(writers, rows);
@@ -389,6 +419,19 @@ public final class cladinator {
             System.out.println();
             System.out.println("Trees: " + counter + ", with result: " + (counter - input_errors - non_homologous)
                     + ", likely non-homologous query: " + non_homologous + ", input errors: " + input_errors);
+            if (none_shared > 0) {
+                System.err.println();
+                System.err.println("[" + PRG_NAME + "] > WARNING: in " + none_shared + " of " + counter
+                        + " tree(s) every reference leaf had a label of its own, so the clade annotations were not read"
+                        + " and the results are about single leaves; " + LabelStatistics.HINT + " (-" + DRY_RUN_OPTION
+                        + " shows what is read)");
+            }
+            if (most_alone > 0) {
+                System.err.println();
+                System.err.println("[" + PRG_NAME + "] > WARNING: in " + most_alone + " of " + counter
+                        + " tree(s) most reference leaves had a label of their own; " + LabelStatistics.HINT
+                        + " (see the Warnings column)");
+            }
             if ((counter > 0) && (input_errors == counter)) {
                 ForesterUtil.fatalError(PRG_NAME, "no tree could be analyzed (" + input_errors + " input error(s), see the table)");
             }
@@ -425,13 +468,116 @@ public final class cladinator {
         final String query_name;
         final int placements;
         final boolean input_error;
+        /** What the labels looked like, if known. */
+        final LabelStatistics stats;
 
         TreeProblem(final String message, final String query_name, final int placements, final boolean input_error) {
+            this(message, query_name, placements, input_error, null);
+        }
+
+        TreeProblem(final String message, final String query_name, final int placements, final boolean input_error,
+                    final LabelStatistics stats) {
             super(message);
             this.query_name = query_name;
             this.placements = placements;
             this.input_error = input_error;
+            this.stats = stats;
         }
+    }
+
+    /** The rows of a tree and what its labels looked like. */
+    private record TreeOutput(String rows, LabelStatistics stats) {
+    }
+
+    /** Applies the mapping file and the extra or special processing to the labels of a tree. */
+    private static void processLabels(final Phylogeny phy, final Settings st, final boolean verbose) throws UserException {
+        if (st.map() != null) {
+            AnalysisMulti.performMapping(st.pattern(), st.map(), phy, verbose);
+        }
+        if (st.extra_processing1()) {
+            AnalysisMulti.performExtraProcessing1(st.pattern(), phy, st.extra_processing1_sep(), st.extra_processing1_keep(), st.separator(), verbose);
+        } else if (st.special_processing()) {
+            AnalysisMulti.performSpecialProcessing1(st.pattern(), phy, st.separator(), st.special_pattern(), verbose);
+        }
+    }
+
+    /**
+     * -dry-run: the run without the table. Shows what is read from each tree after the label processing, and
+     * what the run would report for it (a result, an input error, or a likely non-homologous query). Returns
+     * false if a tree would get an input error, or if no two of its reference leaves share a top-level label.
+     */
+    private static boolean dryRun(final Phylogeny[] phys, final Settings st) {
+        System.out.println();
+        System.out.println("Dry run:");
+        int counter = 0;
+        int errors = 0;
+        int warnings = 0;
+        int non_homologous = 0;
+        for (final Phylogeny phy : phys) {
+            ++counter;
+            final List<PhylogenyNode> query_nodes = phy.getNodes(st.pattern());
+            final boolean no_query = (query_nodes == null) || query_nodes.isEmpty();
+            final String query = no_query ? "no query found (query pattern: " + st.pattern() + ")"
+                    : "query \"" + queryNamePrefix(query_nodes.get(0), st.pattern()) + "\" with " + query_nodes.size()
+                    + " placement" + (query_nodes.size() == 1 ? "" : "s");
+            final LabelStatistics stats;
+            try {
+                processLabels(phy, st, false);
+                stats = AnalysisMulti.prepare(phy, st.pattern(), st.separator());
+            } catch (final UserException e) {
+                System.out.println("Tree " + counter + ": ERROR: " + e.getMessage());
+                ++errors;
+                continue;
+            }
+            System.out.println("Tree " + counter + ": " + stats.summary() + "; " + query);
+            final List<String> labels = new ArrayList<>();
+            for (final PhylogenyNodeIterator it = phy.iteratorExternalForward(); it.hasNext() && (labels.size() < 10); ) {
+                final PhylogenyNode n = it.next();
+                if (!st.pattern().matcher(n.getName()).find()) {
+                    labels.add(n.getName());
+                }
+            }
+            System.out.println("  labels" + (stats.leaves() > 10 ? " (first 10)" : "") + ": " + String.join(", ", labels));
+            if (stats.noneShared()) {
+                System.out.println("  ERROR: " + stats.problem());
+                ++errors;
+            } else if (stats.mostAlone()) {
+                System.out.println("  WARNING: " + stats.problem());
+                ++warnings;
+            }
+            if (no_query) {
+                System.out.println("  ERROR: no query found");
+                ++errors;
+                continue;
+            }
+            // what the run would report for this tree
+            if ((st.nh_factor() > 0) && AnalysisMulti.likelyProblematicQuery(phy, st.pattern(), st.nh_factor())) {
+                System.out.println("  run: " + NON_HOMOLOGOUS_QUERY_MESSAGE);
+                ++non_homologous;
+                continue;
+            }
+            try {
+                final ResultMulti res = AnalysisMulti.execute(phy, st.pattern(), st.separator(), stats);
+                final Classification c = Classification.of(res, st.cutoff(), st.distance_threshold());
+                for (final String w : res.getWarnings()) {
+                    if (!w.equals(stats.problem())) {
+                        System.out.println("  WARNING: " + w);
+                    }
+                }
+                for (final String note : notes(c, st.label())) {
+                    System.out.println("  note: " + note);
+                }
+                System.out.println("  run: OK, " + conclusionText(c, st.label())
+                        + ((c.getAssignment() != null) ? " (assignment " + st.label().apply(c.getAssignment()) + ")" : ""));
+            } catch (final UserException e) {
+                System.out.println("  ERROR: " + e.getMessage());
+                ++errors;
+            }
+        }
+        System.out.println();
+        System.out.println("Dry run: " + counter + " tree(s), " + errors + " with errors, " + warnings + " with warnings, "
+                + non_homologous + " with a likely non-homologous query");
+        return errors == 0;
     }
 
     private static void emit(final List<BufferedWriter> writers, final String text) throws IOException {
@@ -442,29 +588,24 @@ public final class cladinator {
     }
 
     /** Analyzes one tree and returns its row(s) of the table. */
-    private static String analyzeTree(final Phylogeny phy, final int counter, final Settings st) throws TreeProblem {
+    private static TreeOutput analyzeTree(final Phylogeny phy, final int counter, final Settings st) throws TreeProblem {
         final Pattern pattern = st.pattern();
         final List<PhylogenyNode> query_nodes = phy.getNodes(pattern); // null for an empty tree
         if ((query_nodes == null) || query_nodes.isEmpty()) {
             throw new TreeProblem("Input error: no query found (query pattern: " + pattern + ")", "", 0, true);
         }
         final String query_name = queryNamePrefix(query_nodes.get(0), pattern);
+        LabelStatistics stats = null;
         try {
-            if (st.map() != null) {
-                AnalysisMulti.performMapping(pattern, st.map(), phy, true);
-            }
-            if (st.extra_processing1()) {
-                AnalysisMulti.performExtraProcessing1(pattern, phy, st.extra_processing1_sep(), st.extra_processing1_keep(), st.separator(), true);
-            } else if (st.special_processing()) {
-                AnalysisMulti.performSpecialProcessing1(pattern, phy, st.separator(), st.special_pattern(), true);
-            }
+            processLabels(phy, st, true);
+            stats = AnalysisMulti.prepare(phy, pattern, st.separator());
             if ((st.nh_factor() > 0) && AnalysisMulti.likelyProblematicQuery(phy, pattern, st.nh_factor())) {
-                throw new TreeProblem(NON_HOMOLOGOUS_QUERY_MESSAGE, query_name, query_nodes.size(), false);
+                throw new TreeProblem(NON_HOMOLOGOUS_QUERY_MESSAGE, query_name, query_nodes.size(), false, stats);
             }
-            final ResultMulti res = AnalysisMulti.execute(phy, pattern, st.separator());
-            return resultRows(res, counter, st);
+            final ResultMulti res = AnalysisMulti.execute(phy, pattern, st.separator(), stats);
+            return new TreeOutput(resultRows(res, counter, st), stats);
         } catch (final UserException e) {
-            throw new TreeProblem("Input error: " + e.getMessage(), query_name, query_nodes.size(), true);
+            throw new TreeProblem("Input error: " + e.getMessage(), query_name, query_nodes.size(), true, stats);
         }
     }
 
@@ -494,13 +635,14 @@ public final class cladinator {
         return rows.toString();
     }
 
-    private static String errorRow(final int counter, final String query, final String message, final int placements) {
+    private static String errorRow(final int counter, final String query, final String message, final int placements, final String warning) {
         final String[] cells = new String[COLUMNS.length];
         Arrays.fill(cells, "");
         cells[column("Tree #")] = String.valueOf(counter);
         cells[column("Query")] = query;
         cells[column("Conclusion")] = message;
         cells[column("Placement count")] = String.valueOf(placements);
+        cells[column("Warnings")] = warning;
         return String.join("\t", cells) + "\n";
     }
 
@@ -614,6 +756,8 @@ public final class cladinator {
         System.out.println("                      as far from the root as the farthest reference leaf (default: " + NON_HOMOLOGOUS_FACTOR_DEFAULT + ", 0 turns the check off)");
         System.out.println("  -" + DISTANCE_THRESHOLD_OPTION + "=<distance>      : decide member vs. novel by distance: a query closer than <distance> to a reference leaf is a member of");
         System.out.println("                      that leaf's clade, one farther from every reference leaf is a novel lineage (default: by topology)");
+        System.out.println("  -" + DRY_RUN_OPTION + "           : the run without the table: shows what is read from each tree after the label processing (leaves,");
+        System.out.println("                      top-level clades, label levels, the first labels, the query) and what the run would report for it");
         System.out.println("  -" + QUERY_PATTERN_OPTION + "=<pattern>       : expert option: the regular expression pattern for the query (default: \"" + QUERY_PATTERN_DEFAULT + "\" for pplacer output)");
         System.out.println();
         System.out.println("Examples:");

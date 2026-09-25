@@ -1,0 +1,9 @@
+Dry run:
+Tree 1: 6 reference leaves, 2 top-level clades (A: 3, B: 3), 3 label levels; no query found (query pattern: _#\d+_M=(.+))
+  labels: A.1.1, A.1.2, A.2.1, B.1.1, B.1.2, B.2.1
+  ERROR: no query found
+Tree 2: 7 reference leaves, 2 top-level clades (A: 4, B: 3), 3 label levels; query "Q1" with 1 placement
+  labels: A.1.1, A.1.2, A.2.1, A.2.2, B.1.1, B.1.2, B.2.1
+  run: OK, potential for novel sub-species within clade A (assignment A)
+
+Dry run: 2 tree(s), 1 with errors, 0 with warnings, 0 with a likely non-homologous query

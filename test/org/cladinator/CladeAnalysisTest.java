@@ -431,4 +431,70 @@ class CladeAnalysisTest {
         assertThrows(IllegalArgumentException.class, () -> Classification.of(res, 0.7, Double.NaN));
         assertNotNull(Classification.of(res, 0.7, 0.0));
     }
+
+    // ---- Are the labels clade annotations?
+
+    @Test
+    void labelStatistics() throws Exception {
+        final LabelStatistics st = AnalysisMulti.prepare(tree("((((A.1.1,A.1.2),Q_#1_M=1.0),(A.2.1,A.2.2)),((B.1.1,B.1.2),B.2.1))"), QUERY, ".");
+        assertEquals(7, st.leaves());
+        assertEquals(2, st.distinctTopLevel());
+        assertEquals(0, st.leavesAlone());
+        assertEquals(3, st.minLevels());
+        assertEquals(3, st.maxLevels());
+        assertEquals(List.of("A", "B"), List.copyOf(st.topLevelCounts().keySet()));
+        assertEquals(4, st.topLevelCounts().get("A"));
+        assertFalse(st.noneShared());
+        assertFalse(st.mostAlone());
+        assertEquals("7 reference leaves, 2 top-level clades (A: 4, B: 3), 3 label levels", st.summary());
+        assertNull(st.problem());
+        // prepare rejects malformed labels, as a run does
+        assertThrows(UserException.class, () -> AnalysisMulti.prepare(tree("((((A.1.1,A.1.2),Q_#1_M=1.0),(A.2.1,A.2.2.)),B.1)"), QUERY, "."));
+        assertThrows(UserException.class, () -> AnalysisMulti.prepare(tree("((((A.1.1,A..2),Q_#1_M=1.0),(A.2.1,A.2.2)),B.1)"), QUERY, "."));
+    }
+
+    @Test
+    void sequenceIdentifiersInsteadOfAnnotationsAreWarnedAbout() throws Exception {
+        // a forgotten mapping file: accession-like labels
+        final ResultMulti ids = analyze("((((NC_1.1,NC_2.1),Q_#1_M=1.0),(NC_3.1,NC_4.1)),((KX_5.1,KX_6.1),KX_7.1))");
+        assertTrue(ids.getLabelStatistics().noneShared());
+        assertEquals(1, ids.getWarnings().size(), ids.getWarnings().toString());
+        assertTrue(ids.getWarnings().get(0).startsWith("every reference leaf has a label of its own (7 leaves, 7 distinct top-level labels, e.g. \"KX_5\", \"KX_6\")"), ids.getWarnings().get(0));
+        assertTrue(ids.getWarnings().get(0).contains("-m"));
+        // a forgotten -x: "ID|A.1.1"
+        assertTrue(analyze("((((Q1|A.1.1,Q2|A.1.2),Q_#1_M=1.0),(Q3|A.2.1,Q4|A.2.2)),((Q5|B.1.1,Q6|B.1.2),Q7|B.2.1))").getLabelStatistics().noneShared());
+        // the wrong separator: "A_1_1" read with "."
+        assertTrue(analyze("((((A_1_1,A_1_2),Q_#1_M=1.0),(A_2_1,A_2_2)),((B_1_1,B_1_2),B_2_1))").getLabelStatistics().noneShared());
+        // a single reference leaf
+        assertTrue(analyze("(A.1,Q_#1_M=1.0)").getWarnings().get(0).contains("(1 leaf, 1 distinct top-level label, e.g. \"A\")"));
+    }
+
+    @Test
+    void flatReferenceWithOneLeafPerCladeStillClassifies() throws Exception {
+        // one sequence per clade, correct options: warned about, but "sister to clade A" is still a result
+        final ResultMulti res = analyze("((A:0.1,Q_#1_M=1.0:0.1):0.1,(B:0.1,C:0.1):0.1)");
+        assertTrue(res.getLabelStatistics().noneShared());
+        assertEquals(1, res.getWarnings().size());
+        final Classification c = Classification.of(res, 0.7);
+        assertEquals(Conclusion.OUTSIDE_SISTER_TO, c.getConclusion());
+        assertEquals("A", c.getConclusionClade());
+    }
+
+    @Test
+    void keptIdentifiersAsLastLevelAreFine() throws Exception {
+        // -x -xk makes every full label unique on purpose; the top level is still shared
+        final ResultMulti res = analyze("((((A.1.1.Q1,A.1.2.Q2),Q_#1_M=1.0),(A.2.1.Q3,A.2.2.Q4)),((B.1.1.Q5,B.1.2.Q6),B.2.1.Q7))");
+        assertTrue(res.getWarnings().isEmpty(), res.getWarnings().toString());
+        assertEquals(2, res.getLabelStatistics().distinctTopLevel());
+        assertEquals("A", Classification.of(res, 0.7).getAssignment());
+    }
+
+    @Test
+    void mostLeavesAloneIsAWarning() throws Exception {
+        final ResultMulti res = analyze("((((A.1,A.2),Q_#1_M=1.0),(C,D)),E)");
+        assertTrue(res.getLabelStatistics().mostAlone());
+        assertEquals(3, res.getLabelStatistics().leavesAlone());
+        assertEquals(1, res.getWarnings().size(), res.getWarnings().toString());
+        assertTrue(res.getWarnings().get(0).startsWith("most reference leaves have a label of their own (3 of 5)"), res.getWarnings().get(0));
+    }
 }

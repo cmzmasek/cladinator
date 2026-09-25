@@ -19,17 +19,28 @@ while IFS= read -r line; do
     opts=$(printf '%s\n' "$line" | cut -f3)
     expected_rc=$(printf '%s\n' "$line" | cut -f4)
     out="$TMP/$name.tsv"
-    # shellcheck disable=SC2086
-    java -jar "$JAR" $opts "test/data/$tree" "$out" > "$TMP/$name.log" 2>&1
-    rc=$?
+    case " $opts " in
+    *" -dry-run "*)
+        # a -dry-run case compares the report on stdout (from "Dry run:" on), expected in <name>.txt
+        # shellcheck disable=SC2086
+        java -jar "$JAR" $opts "test/data/$tree" > "$TMP/$name.log" 2>&1
+        rc=$?
+        sed -n '/^Dry run:/,$p' "$TMP/$name.log" > "$out.cmp"
+        expected="test/cli/expected/$name.txt" ;;
+    *)
+        # shellcheck disable=SC2086
+        java -jar "$JAR" $opts "test/data/$tree" "$out" > "$TMP/$name.log" 2>&1
+        rc=$?
+        # the "# cladinator <version> (<date>)" line is left out so that a version bump does not change every table
+        grep -v '^# cladinator ' "$out" > "$out.cmp" 2>/dev/null
+        expected="test/cli/expected/$name.tsv" ;;
+    esac
     if [ "$rc" != "${expected_rc:-0}" ]; then
         echo "FAIL $name: exit code $rc, expected ${expected_rc:-0}"; tail -3 "$TMP/$name.log"; failed=1; continue
     fi
-    # the "# cladinator <version> (<date>)" line is left out so that a version bump does not change every table
-    grep -v '^# cladinator ' "$out" > "$out.cmp"
     if [ $update = 1 ]; then
-        cp "$out.cmp" "test/cli/expected/$name.tsv"; echo "updated $name"
-    elif ! diff -u "test/cli/expected/$name.tsv" "$out.cmp"; then
+        cp "$out.cmp" "$expected"; echo "updated $name"
+    elif ! diff -u "$expected" "$out.cmp"; then
         echo "FAIL $name: output differs"; failed=1
     fi
 done < test/cli/cases.tsv

@@ -1,0 +1,7 @@
+Dry run:
+Tree 1: 7 reference leaves, 7 top-level clades (A_1_1: 1, A_1_2: 1, A_2_1: 1, A_2_2: 1, B_1_1: 1, B_1_2: 1, B_2_1: 1), 1 label level; query "Q6" with 2 placements
+  labels: A_1_1, A_1_2, A_2_1, A_2_2, B_1_1, B_1_2, B_2_1
+  ERROR: every reference leaf has a label of its own (7 leaves, 7 distinct top-level labels, e.g. "A_1_1", "A_1_2"): the clade annotations are not being read; check the annotation separator (-s), the mapping file (-m) and the extra processing (-x)
+  run: OK, outside all clades
+
+Dry run: 1 tree(s), 1 with errors, 0 with warnings, 0 with a likely non-homologous query

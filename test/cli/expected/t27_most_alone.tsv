@@ -1,0 +1,7 @@
+# input trees: test/data/t27_most_alone.nwk
+# annotation separator: .
+# query pattern: _#\d+_M=(.+)
+# confidence cutoff: 0.7
+# non-homologous query factor: 2.0
+#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Support	Placement count	Pendant length	Reference depth	Nearest leaf	Nearest distance	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
+1	Q27		1.0	n/a	outside all clades, sister to clade A.1	1.0	1	0.1	0.4	A.1.1	0.3	?:1.0	A.1:1.0	?:1.0	most reference leaves have a label of their own (4 of 6): check the annotation separator (-s), the mapping file (-m) and the extra processing (-x)

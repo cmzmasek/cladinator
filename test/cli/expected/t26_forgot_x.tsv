@@ -1,0 +1,7 @@
+# input trees: test/data/t26_forgot_x.nwk
+# annotation separator: .
+# query pattern: _#\d+_M=(.+)
+# confidence cutoff: 0.7
+# non-homologous query factor: 2.0
+#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Support	Placement count	Pendant length	Reference depth	Nearest leaf	Nearest distance	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
+1	Q1		1.0	n/a	outside all clades	1.0	1	0.1	0.4	QA11|A.1.1	0.3	?:1.0	?:1.0	?:1.0	every reference leaf has a label of its own (7 leaves, 7 distinct top-level labels, e.g. "QA11|A", "QA12|A"): the clade annotations are not being read; check the annotation separator (-s), the mapping file (-m) and the extra processing (-x)

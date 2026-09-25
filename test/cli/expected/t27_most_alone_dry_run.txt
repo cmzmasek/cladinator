@@ -1,0 +1,7 @@
+Dry run:
+Tree 1: 6 reference leaves, 5 top-level clades (A: 2, C: 1, D: 1, E: 1, F: 1), 2-3 label levels; query "Q27" with 1 placement
+  labels: A.1.1, A.1.2, C.1, D.1, E.1, F.1
+  WARNING: most reference leaves have a label of their own (4 of 6): check the annotation separator (-s), the mapping file (-m) and the extra processing (-x)
+  run: OK, outside all clades, sister to clade A.1
+
+Dry run: 1 tree(s), 0 with errors, 1 with warnings, 0 with a likely non-homologous query

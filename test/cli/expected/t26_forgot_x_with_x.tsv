@@ -1,0 +1,8 @@
+# input trees: test/data/t26_forgot_x.nwk
+# annotation separator: .
+# query pattern: _#\d+_M=(.+)
+# confidence cutoff: 0.7
+# non-homologous query factor: 2.0
+# extra processing: separator "|", keep extra: false
+#Tree #	Query	Assignment	Confidence	Brackets	Conclusion	Support	Placement count	Pendant length	Reference depth	Nearest leaf	Nearest distance	Clade confidences	Down-tree confidences	Up-tree confidences	Warnings
+1	Q1	A	1.0	[A.1, A.2]	potential for novel sub-species within clade A	1.0	1	0.1	0.4	A.1.1	0.3	A:1.0	A.1:1.0	A.2:1.0	

@@ -51,6 +51,7 @@ public final class ResultMulti {
     private final List<String> _warnings = new ArrayList<String>();
     private final List<Placement> _placements = new ArrayList<Placement>();
     private Double _reference_depth = null;
+    private LabelStatistics _label_statistics = null;
 
     ResultMulti(final String separator) {
         if (ForesterUtil.isEmpty(separator)) {
@@ -113,6 +114,15 @@ public final class ResultMulti {
 
     void addPlacement(final Placement placement) {
         _placements.add(placement);
+    }
+
+    /** What the reference leaf labels look like (see {@link LabelStatistics}). */
+    public LabelStatistics getLabelStatistics() {
+        return _label_statistics;
+    }
+
+    void setLabelStatistics(final LabelStatistics label_statistics) {
+        _label_statistics = label_statistics;
     }
 
     /** The distance to the root of the farthest reference leaf, or null if the tree has no branch lengths. */

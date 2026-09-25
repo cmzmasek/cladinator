@@ -22,7 +22,9 @@
 package org.cladinator;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.SortedMap;
@@ -91,12 +93,35 @@ public final class AnalysisMulti {
                                       final Pattern query,
                                       final String separator)
             throws UserException {
+        return execute(p, query, separator, prepare(p, query, separator));
+    }
+
+    /**
+     * Checks the leaf labels of a tree (after the mapping and the extra or special processing) and tells what
+     * they look like. Malformed labels (empty, starting or ending with the separator, an empty level) are
+     * input errors. To be called before {@link #execute(Phylogeny, Pattern, String, LabelStatistics)}.
+     */
+    public static LabelStatistics prepare(final Phylogeny p, final Pattern query, final String separator)
+            throws UserException {
         if (ForesterUtil.isEmpty(separator)) {
             throw new UserException("separator must not be null or empty");
         }
         cleanUpExternalNames(p, separator);
+        return labelStatistics(p, query, separator);
+    }
+
+    /** The analysis of a tree whose labels {@link #prepare} has checked. */
+    public static ResultMulti execute(final Phylogeny p,
+                                      final Pattern query,
+                                      final String separator,
+                                      final LabelStatistics stats)
+            throws UserException {
         final List<PhylogenyNode> qnodes = p.getNodes(query);
         final ResultMulti res = new ResultMulti(separator);
+        res.setLabelStatistics(stats);
+        if (stats.problem() != null) {
+            res.addWarning(stats.problem());
+        }
         res.setQueryNamePrefix(obtainQueryPrefix(query, qnodes));
         res.setTotalNumberOfMatches(qnodes.size());
         res.setReferenceTreeNumberOfExternalNodes(p.getNumberOfExternalNodes() - qnodes.size());
@@ -107,7 +132,8 @@ public final class AnalysisMulti {
             res.addWarning("the root has " + p.getRoot().getNumberOfDescendants()
                     + " children (unrooted tree?): the up-tree brackets depend on the root");
         }
-        final List<String> lonely = leavesWithUniqueTopLevelLabel(p, query, separator);
+        final List<String> lonely = (stats.problem() != null) ? new ArrayList<String>()
+                : leavesWithUniqueTopLevelLabel(p, query, separator, stats.topLevelCounts());
         if (!lonely.isEmpty()) {
             res.addWarning("only one reference leaf in top-level clade" + (lonely.size() == 1 ? " " : "s ")
                     + String.join(", ", lonely) + ": no clade containing "
@@ -272,24 +298,55 @@ public final class AnalysisMulti {
         }
     }
 
+    /** The reference leaf labels of a tree (cleaned up by {@link #cleanUpExternalNames}). */
+    private static LabelStatistics labelStatistics(final Phylogeny p, final Pattern query, final String separator) {
+        final Map<String, Integer> counts = new HashMap<>();
+        int leaves = 0;
+        int min_levels = Integer.MAX_VALUE;
+        int max_levels = 0;
+        for (final PhylogenyNodeIterator it = p.iteratorExternalForward(); it.hasNext(); ) {
+            final PhylogenyNode n = it.next();
+            final String name = n.getName();
+            if (!query.matcher(name).find()) {
+                ++leaves;
+                counts.merge(topLevel(name, separator), 1, Integer::sum);
+                final int levels = levels(name, separator);
+                min_levels = Math.min(min_levels, levels);
+                max_levels = Math.max(max_levels, levels);
+            }
+        }
+        final List<Map.Entry<String, Integer>> sorted = new ArrayList<>(counts.entrySet());
+        sorted.sort((a, b) -> (b.getValue().equals(a.getValue())) ? a.getKey().compareTo(b.getKey()) : b.getValue() - a.getValue());
+        final Map<String, Integer> top = new LinkedHashMap<>();
+        for (final Map.Entry<String, Integer> e : sorted) {
+            top.put(e.getKey(), e.getValue());
+        }
+        return new LabelStatistics(Collections.unmodifiableMap(top), (leaves == 0) ? 0 : min_levels, max_levels);
+    }
+
+    /** The number of levels of a label: one more than its separators. */
+    private static int levels(final String label, final String separator) {
+        int n = 1;
+        for (int i = label.indexOf(separator); i >= 0; i = label.indexOf(separator, i + separator.length())) {
+            ++n;
+        }
+        return n;
+    }
+
     /**
      * Reference leaves whose top-level label (the part before the first separator) no other reference leaf has,
      * except leaves attached to the root (an outgroup). Such a leaf leaves every clade containing it without a
      * common label. At most 5 are listed.
      */
-    private static List<String> leavesWithUniqueTopLevelLabel(final Phylogeny p, final Pattern query, final String separator) {
-        final Map<String, Integer> counts = new HashMap<>();
-        final List<PhylogenyNode> leaves = new ArrayList<>();
-        for (final PhylogenyNodeIterator it = p.iteratorExternalForward(); it.hasNext(); ) {
-            final PhylogenyNode n = it.next();
-            if (!query.matcher(n.getName()).find()) {
-                leaves.add(n);
-                counts.merge(topLevel(n.getName(), separator), 1, Integer::sum);
-            }
-        }
+    private static List<String> leavesWithUniqueTopLevelLabel(final Phylogeny p, final Pattern query, final String separator,
+                                                              final Map<String, Integer> counts) {
         final List<String> lonely = new ArrayList<>();
         int more = 0;
-        for (final PhylogenyNode n : leaves) {
+        for (final PhylogenyNodeIterator it = p.iteratorExternalForward(); it.hasNext(); ) {
+            final PhylogenyNode n = it.next();
+            if (query.matcher(n.getName()).find()) {
+                continue;
+            }
             if ((counts.get(topLevel(n.getName(), separator)) == 1) && !n.getParent().isRoot()) {
                 if (lonely.size() < 5) {
                     lonely.add(topLevel(n.getName(), separator) + " (\"" + n.getName() + "\")");

@@ -33,3 +33,11 @@ t22_single_leaf_sister_d02	t22_single_leaf_sister.nwk	-d=0.2
 t22_single_leaf_sister_d005	t22_single_leaf_sister.nwk	-d=0.05
 t15_no_branch_lengths_d	t15_no_branch_lengths.nwk	-d=0.1
 t25_distance_mixed	t25_distance_mixed.nwk	-d=0.2
+t26_forgot_x	t26_forgot_x.nwk	
+t26_forgot_x_with_x	t26_forgot_x.nwk	-x
+t27_most_alone	t27_most_alone.nwk	
+t01_dry_run	t01_single.nwk	-dry-run
+t06_sep_us_dry_run	t06_sep_us.nwk	-dry-run	255
+t26_forgot_x_dry_run_x	t26_forgot_x.nwk	-dry-run -x
+t27_most_alone_dry_run	t27_most_alone.nwk	-dry-run
+t07_dry_run_no_query	t07_nomatch_then_ok.nwk	-dry-run	255
