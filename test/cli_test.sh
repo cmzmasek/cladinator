@@ -1,7 +1,7 @@
 #!/bin/bash
 # Command-line regression tests: runs dist/cladinator.jar on each case in test/cli/cases.tsv
 # and compares the output table with test/cli/expected/<name>.tsv.
-# A case line is: name, tree, options, and optionally the expected exit code (default 0).
+# A case line is: name, tree, options, and optionally the expected exit code (default 0); a -demo case has no tree.
 # Usage: test/cli_test.sh            run all cases
 #        test/cli_test.sh --update   rewrite the expected tables from the current jar
 cd "$(dirname "$0")/.."
@@ -20,6 +20,13 @@ while IFS= read -r line; do
     expected_rc=$(printf '%s\n' "$line" | cut -f4)
     out="$TMP/$name.tsv"
     case " $opts " in
+    *" -demo "*)
+        # a -demo case takes no tree and compares the demo on stdout (from "Demo:" on), expected in <name>.txt
+        # shellcheck disable=SC2086
+        java -jar "$JAR" $opts > "$TMP/$name.log" 2>&1
+        rc=$?
+        sed -n '/^Demo:/,$p' "$TMP/$name.log" > "$out.cmp"
+        expected="test/cli/expected/$name.txt" ;;
     *" -dry-run "*)
         # a -dry-run case compares the report on stdout (from "Dry run:" on), expected in <name>.txt
         # shellcheck disable=SC2086

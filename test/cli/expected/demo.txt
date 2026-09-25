@@ -1,0 +1,477 @@
+Demo: 12 synthetic trees with a query placed in them, from the plain case to the edge cases,
+with the output cladinator gives for each.
+
+Every tree has the same reference: clade A with the sub-clades A.1 (leaves labeled A.1.1 and A.1.2)
+and A.2 (A.2.1 and A.2.2), clade B (B.1 and B.2) and clade C, with all branches 0.1 long unless a
+case says otherwise. Most labels have two leaves, standing for the sequences of a sub-species. The
+query Q is placed as pplacer's guppy sing writes it: one leaf per placement, named
+Q_#<placement>_M=<confidence>.
+
+Each tree is drawn with its structure and names only, without branch lengths. Below it is the row
+cladinator writes for the tree, one column per line; a run writes it as one tab-separated line of
+the output table. The last line of a case is the conclusion the case is meant to show, and whether
+it was drawn.
+
+--- Case 1 of 12: one placement deep inside a sub-clade ---
+Shows: The query is sister to an A.1.1 leaf, with the other A.1.1 leaf next to them, so it is a
+member of A.1.1. The assignment is the most specific clade whose placements reach the cutoff (0.7):
+A.1.1, not A.1 or A. The brackets are the sister clade of the placement and the clade on the other
+side of it.
+
+  +--+--+--+--+-- A.1.1
+     |  |  |  `--+-- A.1.1
+     |  |  |     `-- Q_#1_M=1.0
+     |  |  `--+-- A.1.2
+     |  |     `-- A.1.2
+     |  `--+--+-- A.2.1
+     |     |  `-- A.2.1
+     |     `-- A.2.2
+     `--+--+--+-- B.1
+        |  |  `-- B.1
+        |  `-- B.2
+        `--+-- C
+           `-- C
+
+Options: none (the defaults)
+Tree #               : 1
+Query                : Q
+Assignment           : A.1.1
+Confidence           : 1.0
+Brackets             : [A.1.1, A.1.1]
+Conclusion           : member of clade A.1.1
+Support              : 1.0
+Placement count      : 1
+Pendant length       : 0.05
+Reference depth      : 0.4
+Nearest leaf         : A.1.1
+Nearest distance     : 0.1
+Clade confidences    : A.1.1:1.0
+Down-tree confidences: A.1.1:1.0
+Up-tree confidences  : A.1.1:1.0
+Warnings             :
+Expected: member of clade A.1.1 -- as expected
+
+--- Case 2 of 12: one placement sister to a whole sub-clade ---
+Shows: The query branches off between the sub-clades A.1 and A.2: it is within A, but within neither
+sub-clade, so there is potential for a novel sub-species within A. The brackets [A.1, A.2] say
+between which clades it lies.
+
+  +--+--+--+--+--+-- A.1.1
+     |  |  |  |  `-- A.1.1
+     |  |  |  `--+-- A.1.2
+     |  |  |     `-- A.1.2
+     |  |  `-- Q_#1_M=1.0
+     |  `--+--+-- A.2.1
+     |     |  `-- A.2.1
+     |     `-- A.2.2
+     `--+--+--+-- B.1
+        |  |  `-- B.1
+        |  `-- B.2
+        `--+-- C
+           `-- C
+
+Options: none (the defaults)
+Tree #               : 2
+Query                : Q
+Assignment           : A
+Confidence           : 1.0
+Brackets             : [A.1, A.2]
+Conclusion           : potential for novel sub-species within clade A
+Support              : 1.0
+Placement count      : 1
+Pendant length       : 0.05
+Reference depth      : 0.45
+Nearest leaf         : A.2.2
+Nearest distance     : 0.3
+Clade confidences    : A:1.0
+Down-tree confidences: A.1:1.0
+Up-tree confidences  : A.2:1.0
+Warnings             :
+Expected: potential for novel sub-species within clade A -- as expected
+
+--- Case 3 of 12: one placement sister to a single reference leaf ---
+Shows: The sister of the query is the single A.2.2 leaf, with A.2.1 leaves on the other side.
+Topologically this is a novel sub-species within A.2, but one leaf cannot tell a novel sub-species
+from a second sequence of A.2.2, so the Warnings column says that membership in A.2.2 cannot be
+excluded. A distance threshold (-d, case 8) can decide.
+
+  +--+--+--+--+-- A.1.1
+     |  |  |  `-- A.1.1
+     |  |  `--+-- A.1.2
+     |  |     `-- A.1.2
+     |  `--+--+-- A.2.1
+     |     |  `-- A.2.1
+     |     `--+-- A.2.2
+     |        `-- Q_#1_M=1.0
+     `--+--+--+-- B.1
+        |  |  `-- B.1
+        |  `-- B.2
+        `--+-- C
+           `-- C
+
+Options: none (the defaults)
+Tree #               : 3
+Query                : Q
+Assignment           : A.2
+Confidence           : 1.0
+Brackets             : [A.2.2, A.2.1]
+Conclusion           : potential for novel sub-species within clade A.2
+Support              : 1.0
+Placement count      : 1
+Pendant length       : 0.05
+Reference depth      : 0.4
+Nearest leaf         : A.2.2
+Nearest distance     : 0.1
+Clade confidences    : A.2:1.0
+Down-tree confidences: A.2.2:1.0
+Up-tree confidences  : A.2.1:1.0
+Warnings             : sister to a single reference leaf (A.2.2: 1.0): membership in A.2.2 cannot be excluded
+Expected: potential for novel sub-species within clade A.2 -- as expected
+
+--- Case 4 of 12: one placement at the root ---
+Shows: The query branches off at the root, outside every labeled clade: there is no assignment, and
+the conclusion is outside all clades. (A query outside all clades but next to one clade is reported
+as sister to that clade.)
+
+  +--+--+--+--+--+-- A.1.1
+     |  |  |  |  `-- A.1.1
+     |  |  |  `--+-- A.1.2
+     |  |  |     `-- A.1.2
+     |  |  `--+--+-- A.2.1
+     |  |     |  `-- A.2.1
+     |  |     `-- A.2.2
+     |  `--+--+--+-- B.1
+     |     |  |  `-- B.1
+     |     |  `-- B.2
+     |     `--+-- C
+     |        `-- C
+     `-- Q_#1_M=1.0
+
+Options: none (the defaults)
+Tree #               : 4
+Query                : Q
+Assignment           :
+Confidence           : 1.0
+Brackets             : n/a
+Conclusion           : outside all clades
+Support              : 1.0
+Placement count      : 1
+Pendant length       : 0.1
+Reference depth      : 0.5
+Nearest leaf         : A.2.2
+Nearest distance     : 0.5
+Clade confidences    : ?:1.0
+Down-tree confidences: ?:1.0
+Up-tree confidences  : ?:1.0
+Warnings             :
+Expected: outside all clades -- as expected
+
+--- Case 5 of 12: two placements in the same sub-clade ---
+Shows: The two placements lie among the A.1.1 leaves, and their confidences add up (0.6 + 0.4):
+A.1.1 is assigned with confidence 1.0. Brackets are given for a single placement only.
+
+  +--+--+--+--+--+-- A.1.1
+     |  |  |  |  `-- Q_#1_M=0.6
+     |  |  |  `--+-- A.1.1
+     |  |  |     `-- Q_#2_M=0.4
+     |  |  `--+-- A.1.2
+     |  |     `-- A.1.2
+     |  `--+--+-- A.2.1
+     |     |  `-- A.2.1
+     |     `-- A.2.2
+     `--+--+--+-- B.1
+        |  |  `-- B.1
+        |  `-- B.2
+        `--+-- C
+           `-- C
+
+Options: none (the defaults)
+Tree #               : 5
+Query                : Q
+Assignment           : A.1.1
+Confidence           : 1.0
+Brackets             : n/a
+Conclusion           : member of clade A.1.1
+Support              : 1.0
+Placement count      : 2
+Pendant length       : 0.05
+Reference depth      : 0.4
+Nearest leaf         : A.1.1
+Nearest distance     : 0.1
+Clade confidences    : A.1.1:1.0
+Down-tree confidences: A.1.1:1.0
+Up-tree confidences  : A.1.1:1.0
+Warnings             :
+Expected: member of clade A.1.1 -- as expected
+
+--- Case 6 of 12: placements split between two sub-clades, with -c=0.5 ---
+Shows: Half of the confidence lies in A.1.1 and half in A.2.1. With -c=0.5 both A.1 and A.2 reach
+the cutoff and tie, so the walk down from A stops there: member of A, with the tie noted in the
+Warnings column. With the default cutoff neither sub-clade would reach it, and the assignment would
+be A as well.
+
+  +--+--+--+--+-- A.1.1
+     |  |  |  `--+-- A.1.1
+     |  |  |     `-- Q_#1_M=0.5
+     |  |  `--+-- A.1.2
+     |  |     `-- A.1.2
+     |  `--+--+-- A.2.1
+     |     |  `--+-- A.2.1
+     |     |     `-- Q_#2_M=0.5
+     |     `-- A.2.2
+     `--+--+--+-- B.1
+        |  |  `-- B.1
+        |  `-- B.2
+        `--+-- C
+           `-- C
+
+Options: -c=0.5
+Tree #               : 6
+Query                : Q
+Assignment           : A
+Confidence           : 1.0
+Brackets             : n/a
+Conclusion           : member of clade A
+Support              : 1.0
+Placement count      : 2
+Pendant length       : 0.05
+Reference depth      : 0.4
+Nearest leaf         : A.1.1
+Nearest distance     : 0.1
+Clade confidences    : A:1.0;A.1.1:0.5;A.2.1:0.5
+Down-tree confidences: A:1.0;A.1.1:0.5;A.2.1:0.5
+Up-tree confidences  : A:1.0;A.1.1:0.5;A.2.1:0.5
+Warnings             : sub-clades of A tie at the cutoff: A.1 0.5, A.2 0.5
+Expected: member of clade A -- as expected
+
+--- Case 7 of 12: placements split between two top-level clades ---
+Shows: 0.6 of the confidence lies in A and 0.4 in B: no clade reaches the cutoff of 0.7, so there is
+no assignment, and the best match is reported. The Clade confidences column lists every clade the
+placements lie in, with the summed confidence.
+
+  +--+--+--+--+-- A.1.1
+     |  |  |  `--+-- A.1.1
+     |  |  |     `-- Q_#1_M=0.6
+     |  |  `--+-- A.1.2
+     |  |     `-- A.1.2
+     |  `--+--+-- A.2.1
+     |     |  `-- A.2.1
+     |     `-- A.2.2
+     `--+--+--+-- B.1
+        |  |  `--+-- B.1
+        |  |     `-- Q_#2_M=0.4
+        |  `-- B.2
+        `--+-- C
+           `-- C
+
+Options: none (the defaults)
+Tree #               : 7
+Query                : Q
+Assignment           :
+Confidence           : 0.6
+Brackets             : n/a
+Conclusion           : no confident assignment (best match: clade A 0.6)
+Support              : 0.6
+Placement count      : 2
+Pendant length       : 0.05
+Reference depth      : 0.4
+Nearest leaf         : A.1.1
+Nearest distance     : 0.1
+Clade confidences    : A.1.1:0.6;B.1:0.4
+Down-tree confidences: A.1.1:0.6;B.1:0.4
+Up-tree confidences  : A.1.1:0.6;B.1:0.4
+Warnings             :
+Expected: no confident assignment -- as expected
+
+--- Case 8 of 12: a long pendant branch, with -d=0.2 ---
+Shows: The placement of case 1, but on a pendant branch of 0.3 and with -d=0.2. Topologically the
+query is a member of A.1.1. By distance, the nearest reference leaf is 0.35 away, farther than the
+threshold, so the query is a potential novel sub-species within A.1.1, marked (by distance). The
+Pendant length and Nearest distance columns carry the lengths, which the drawing does not show.
+
+  +--+--+--+--+-- A.1.1
+     |  |  |  `--+-- A.1.1
+     |  |  |     `-- Q_#1_M=1.0
+     |  |  `--+-- A.1.2
+     |  |     `-- A.1.2
+     |  `--+--+-- A.2.1
+     |     |  `-- A.2.1
+     |     `-- A.2.2
+     `--+--+--+-- B.1
+        |  |  `-- B.1
+        |  `-- B.2
+        `--+-- C
+           `-- C
+
+Options: -d=0.2
+Tree #               : 8
+Query                : Q
+Assignment           : A.1.1
+Confidence           : 1.0
+Brackets             : [A.1.1, A.1.1]
+Conclusion           : potential for novel sub-species within clade A.1.1 (by distance)
+Support              : 1.0
+Placement count      : 1
+Pendant length       : 0.3
+Reference depth      : 0.4
+Nearest leaf         : A.1.1
+Nearest distance     : 0.35
+Clade confidences    : A.1.1:1.0
+Down-tree confidences: A.1.1:1.0
+Up-tree confidences  : A.1.1:1.0
+Warnings             :
+Expected: potential for novel sub-species within clade A.1.1 -- as expected
+
+--- Case 9 of 12: sequence identifiers in the labels, without -x ---
+Shows: The leaves are named like s01|A.1.1: an identifier, then the annotation. Without -x the whole
+name is the label, every leaf has a label of its own, and the result is about single leaves. The
+loud warning in the Warnings column (and at the end of a run, on stderr) says so; -dry-run shows it
+before a run.
+
+  +--+--+--+--+-- s01|A.1.1
+     |  |  |  `--+-- s02|A.1.1
+     |  |  |     `-- Q_#1_M=1.0
+     |  |  `--+-- s03|A.1.2
+     |  |     `-- s04|A.1.2
+     |  `--+--+-- s05|A.2.1
+     |     |  `-- s06|A.2.1
+     |     `-- s07|A.2.2
+     `--+--+--+-- s08|B.1
+        |  |  `-- s09|B.1
+        |  `-- s10|B.2
+        `--+-- s11|C
+           `-- s12|C
+
+Options: none (the defaults)
+Tree #               : 9
+Query                : Q
+Assignment           :
+Confidence           : 1.0
+Brackets             : [s02|A.1.1, s01|A.1.1]
+Conclusion           : outside all clades, sister to clade s02|A.1.1
+Support              : 1.0
+Placement count      : 1
+Pendant length       : 0.05
+Reference depth      : 0.4
+Nearest leaf         : s02|A.1.1
+Nearest distance     : 0.1
+Clade confidences    : ?:1.0
+Down-tree confidences: s02|A.1.1:1.0
+Up-tree confidences  : s01|A.1.1:1.0
+Warnings             : every reference leaf has a label of its own (12 leaves, 12 distinct top-level labels, e.g. "s01|A", "s02|A"): the clade annotations are not being read; check the annotation separator (-s), the mapping file (-m) and the extra processing (-x)
+Expected: outside all clades, sister to clade s02|A.1.1 -- as expected
+
+--- Case 10 of 12: the same labels, with -x ---
+Shows: -x takes the annotation after the | (the -xs separator) as the label: the same tree now gives
+a member of A.1.1, as in case 1.
+
+  +--+--+--+--+-- s01|A.1.1
+     |  |  |  `--+-- s02|A.1.1
+     |  |  |     `-- Q_#1_M=1.0
+     |  |  `--+-- s03|A.1.2
+     |  |     `-- s04|A.1.2
+     |  `--+--+-- s05|A.2.1
+     |     |  `-- s06|A.2.1
+     |     `-- s07|A.2.2
+     `--+--+--+-- s08|B.1
+        |  |  `-- s09|B.1
+        |  `-- s10|B.2
+        `--+-- s11|C
+           `-- s12|C
+
+Options: -x
+Tree #               : 10
+Query                : Q
+Assignment           : A.1.1
+Confidence           : 1.0
+Brackets             : [A.1.1, A.1.1]
+Conclusion           : member of clade A.1.1
+Support              : 1.0
+Placement count      : 1
+Pendant length       : 0.05
+Reference depth      : 0.4
+Nearest leaf         : A.1.1
+Nearest distance     : 0.1
+Clade confidences    : A.1.1:1.0
+Down-tree confidences: A.1.1:1.0
+Up-tree confidences  : A.1.1:1.0
+Warnings             :
+Expected: member of clade A.1.1 -- as expected
+
+--- Case 11 of 12: an unrooted tree ---
+Shows: The root has three children, as in a tree built from an unrooted reference. The analysis
+works, but which clade lies on the far side of a placement depends on where the root is, so the
+Warnings column notes the rooting.
+
+  +--+--+--+-- A.1.1
+     |  |  `--+-- A.1.1
+     |  |     `-- Q_#1_M=1.0
+     |  `--+-- A.1.2
+     |     `-- A.1.2
+     +--+--+-- A.2.1
+     |  |  `-- A.2.1
+     |  `-- A.2.2
+     `--+--+--+-- B.1
+        |  |  `-- B.1
+        |  `-- B.2
+        `--+-- C
+           `-- C
+
+Options: none (the defaults)
+Tree #               : 11
+Query                : Q
+Assignment           : A.1.1
+Confidence           : 1.0
+Brackets             : [A.1.1, A.1.1]
+Conclusion           : member of clade A.1.1
+Support              : 1.0
+Placement count      : 1
+Pendant length       : 0.05
+Reference depth      : 0.4
+Nearest leaf         : A.1.1
+Nearest distance     : 0.1
+Clade confidences    : A.1.1:1.0
+Down-tree confidences: A.1.1:1.0
+Up-tree confidences  : A.1.1:1.0
+Warnings             : the root has 3 children (unrooted tree?): the up-tree brackets depend on the root
+Expected: member of clade A.1.1 -- as expected
+
+--- Case 12 of 12: confidences that do not add up to 1 ---
+Shows: The placement confidences are 0.5 and 0.3. cladinator rescales them to add up to 1 (0.625 and
+0.375), says so in the Warnings column, and draws the conclusion from the rescaled values.
+
+  +--+--+--+--+--+-- A.1.1
+     |  |  |  |  `-- Q_#1_M=0.5
+     |  |  |  `--+-- A.1.1
+     |  |  |     `-- Q_#2_M=0.3
+     |  |  `--+-- A.1.2
+     |  |     `-- A.1.2
+     |  `--+--+-- A.2.1
+     |     |  `-- A.2.1
+     |     `-- A.2.2
+     `--+--+--+-- B.1
+        |  |  `-- B.1
+        |  `-- B.2
+        `--+-- C
+           `-- C
+
+Options: none (the defaults)
+Tree #               : 12
+Query                : Q
+Assignment           : A.1.1
+Confidence           : 1.0
+Brackets             : n/a
+Conclusion           : member of clade A.1.1
+Support              : 1.0
+Placement count      : 2
+Pendant length       : 0.05
+Reference depth      : 0.4
+Nearest leaf         : A.1.1
+Nearest distance     : 0.1
+Clade confidences    : A.1.1:1.0
+Down-tree confidences: A.1.1:1.0
+Up-tree confidences  : A.1.1:1.0
+Warnings             : placement confidences add up to 0.8 instead of 1, rescaled to 1
+Expected: member of clade A.1.1 -- as expected
+
+Demo: 12 cases, 12 concluded as expected.

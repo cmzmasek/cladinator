@@ -46,9 +46,9 @@ an intended change.
 `dist/cladinator.jar` finds `forester.jar` in the same directory, so keep
 the two files together.
 
-`lib/forester.jar` is forester 0.11.159, built with `ant all` in
+`lib/forester.jar` is forester 0.11.160, built with `ant all` in
 `forester/java` at commit
-[`191a3dc9`](https://github.com/cmzmasek/forester/tree/191a3dc9ee2bafc8276ec3290c317d196873ef6d).
+[`67f25be4`](https://github.com/cmzmasek/forester/tree/67f25be467574302f0b449a45edc6c12ea9f6d35).
 The build checks its checksum against the record in `build.xml`
 (`forester.version`, `forester.commit`, `forester.sha256`); when updating
 the jar, update those three properties and note the new forester version
@@ -76,6 +76,7 @@ Options:
 | `-nh=<factor>` | a query is reported as likely non-homologous when all its placements are at least `<factor>` times as far from the root as the farthest reference leaf (default: 2, `0` turns the check off) |
 | `-d=<distance>` | decide member vs. novel by distance: a query closer than `<distance>` to a reference leaf is a member of that leaf's clade, one farther from every reference leaf is a novel lineage (default: by topology; see below) |
 | `-dry-run` | the run without the table: shows what is read from each tree after the label processing and what the run would report for it (see below) |
+| `-demo` | the demo, with no other options or files: draws twelve synthetic trees with a query placed in them, from the plain case to the edge cases, with the output for each; doubles as a check of the installation (see below) |
 | `-q=<pattern>` | expert option: regular expression for query names (default: `_#\d+_M=(.+)`) |
 
 Examples:
@@ -124,6 +125,68 @@ classified. Three things guard against that:
   tree in which more than half of the leaves have a top-level label of their
   own gets the milder warning `most reference leaves have a label of their
   own (13 of 21): ...`.
+
+### Demo
+
+```
+java -jar dist/cladinator.jar -demo
+```
+
+The demo takes no files. It draws twelve synthetic trees with a query
+placed in them, from the plain case to the edge cases, each followed by
+the row cladinator writes for it, one column per line. The trees share one
+reference (clades A.1.1, A.1.2, A.2.1, A.2.2, B.1, B.2 and C, two leaves
+for most labels); the cases are a placement deep inside a sub-clade, one
+sister to a whole sub-clade, one sister to a single leaf, one at the root,
+two placements that add up, placements split between two sub-clades (with
+`-c=0.5`) and between two top-level clades, a long pendant branch with
+`-d=0.2`, sequence identifiers in the labels without and with `-x`, an
+unrooted tree, and confidences that do not add up to 1. One case looks
+like this:
+
+```
+--- Case 2 of 12: one placement sister to a whole sub-clade ---
+Shows: The query branches off between the sub-clades A.1 and A.2: it is within A, but within neither
+sub-clade, so there is potential for a novel sub-species within A. The brackets [A.1, A.2] say
+between which clades it lies.
+
+  +--+--+--+--+--+-- A.1.1
+     |  |  |  |  `-- A.1.1
+     |  |  |  `--+-- A.1.2
+     |  |  |     `-- A.1.2
+     |  |  `-- Q_#1_M=1.0
+     |  `--+--+-- A.2.1
+     |     |  `-- A.2.1
+     |     `-- A.2.2
+     `--+--+--+-- B.1
+        |  |  `-- B.1
+        |  `-- B.2
+        `--+-- C
+           `-- C
+
+Options: none (the defaults)
+Tree #               : 2
+Query                : Q
+Assignment           : A
+Confidence           : 1.0
+Brackets             : [A.1, A.2]
+Conclusion           : potential for novel sub-species within clade A
+Support              : 1.0
+Placement count      : 1
+Pendant length       : 0.05
+Reference depth      : 0.45
+Nearest leaf         : A.2.2
+Nearest distance     : 0.3
+Clade confidences    : A:1.0
+Down-tree confidences: A.1:1.0
+Up-tree confidences  : A.2:1.0
+Warnings             :
+Expected: potential for novel sub-species within clade A -- as expected
+```
+
+Every case ends with the conclusion it is meant to show and whether it was
+drawn, and the exit status is non-zero if any was not, so the demo doubles
+as a check of an installation. The tests run the same cases.
 
 Notes on options:
 
@@ -278,8 +341,14 @@ java -cp dist/cladinator.jar org.cladinator.cladinator_tree_prepare <in-tree> <o
 
 **Unreleased**
 
-- The forester build that `lib/forester.jar` is (0.11.159, commit
-  `191a3dc9`) is recorded in `build.xml` and here, and the build verifies
+- New option `-demo`: twelve synthetic trees with a query placed in them,
+  from the plain case to the edge cases, drawn on the terminal with the
+  row cladinator writes for each, one column per line. Every case is
+  checked against the conclusion it is meant to show, so the demo doubles
+  as a check of an installation; the tests run the same cases.
+- The bundled `forester.jar` is forester 0.11.160 (its tree drawing is
+  what the demo uses). The forester build it is (version, commit,
+  checksum) is recorded in `build.xml` and here, and the build verifies
   the jar's checksum against that record.
 
 **3.4.0** (2026-09-24)
@@ -364,8 +433,8 @@ Software Foundation, either version 3 of the License, or (at your option)
 any later version (SPDX: `GPL-3.0-or-later`). See [LICENSE](LICENSE).
 
 `lib/forester.jar` is [forester](https://github.com/cmzmasek/forester)
-0.11.159, also GPL-3.0-or-later; its source is forester at commit
-[`191a3dc9`](https://github.com/cmzmasek/forester/tree/191a3dc9ee2bafc8276ec3290c317d196873ef6d).
+0.11.160, also GPL-3.0-or-later; its source is forester at commit
+[`67f25be4`](https://github.com/cmzmasek/forester/tree/67f25be467574302f0b449a45edc6c12ea9f6d35).
 
 ## Contact
 

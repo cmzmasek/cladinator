@@ -13,9 +13,9 @@
          copy the jar here, change these three properties (the build checks the checksum) and note the new
          version under Changes in README.md. -->
     <property name="forester.jar" value="${lib.dir}/forester.jar"/>
-    <property name="forester.version" value="0.11.159"/>
-    <property name="forester.commit" value="191a3dc9ee2bafc8276ec3290c317d196873ef6d"/>
-    <property name="forester.sha256" value="64f78781f2933327d142ec2f8ddaada761ee0991f4960b87749768bdcaad2e22"/>
+    <property name="forester.version" value="0.11.160"/>
+    <property name="forester.commit" value="67f25be467574302f0b449a45edc6c12ea9f6d35"/>
+    <property name="forester.sha256" value="b8e779a302cad170a243aefa3e2a3c6cbac8ed01278050b9813ed98c16affe21"/>
     <!-- JUnit's single-jar console launcher, downloaded on first use (git-ignored) -->
     <property name="junit.version" value="6.1.3"/>
     <property name="junit.sha256" value="e62b96ac475dbcde8599ea905d088f65d90778f86e259b856a49fa5c4ea256ec"/>

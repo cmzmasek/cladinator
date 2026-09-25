@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import java.util.List;
+import java.util.Objects;
 import java.util.SortedMap;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
@@ -36,6 +37,7 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import org.forester.io.parsers.PhylogenyParser;
+import org.forester.io.parsers.nhx.NHXParser;
 import org.forester.io.parsers.util.ParserUtils;
 import org.forester.phylogeny.Phylogeny;
 import org.forester.phylogeny.PhylogenyNode;
@@ -72,6 +74,7 @@ public final class cladinator {
     final static private String NON_HOMOLOGOUS_FACTOR_OPTION = "nh";
     final static private String DISTANCE_THRESHOLD_OPTION = "d";
     final static private String DRY_RUN_OPTION = "dry-run";
+    final static private String DEMO_OPTION = "demo";
     final static private double CUTOFF_DEFAULT = 0.7;
     final static private double NON_HOMOLOGOUS_FACTOR_DEFAULT = 2.0;
     final static private String QUERY_NAME_SPLIT_SEP = "_";
@@ -102,6 +105,12 @@ public final class cladinator {
                 System.out.println();
                 print_help();
                 System.exit(0);
+            }
+            if (cla.isOptionSet(DEMO_OPTION)) {
+                if ((cla.getNumberOfNames() > 0) || (cla.validateAllowedOptionsAsString(List.of(DEMO_OPTION)).length() > 0)) {
+                    ForesterUtil.fatalError(PRG_NAME, "-" + DEMO_OPTION + " takes no files and no other options");
+                }
+                System.exit(demo() ? 0 : -1);
             }
             if ((cla.getNumberOfNames() != 1) && (cla.getNumberOfNames() != 2)) {
                 print_help();
@@ -379,7 +388,7 @@ public final class cladinator {
                 String rows;
                 LabelStatistics stats;
                 try {
-                    final TreeOutput out = analyzeTree(phy, counter, settings);
+                    final TreeOutput out = analyzeTree(phy, counter, settings, true);
                     rows = out.rows();
                     stats = out.stats();
                 } catch (final TreeProblem e) {
@@ -485,8 +494,8 @@ public final class cladinator {
         }
     }
 
-    /** The rows of a tree and what its labels looked like. */
-    private record TreeOutput(String rows, LabelStatistics stats) {
+    /** The rows of a tree, what its labels looked like, and the classification the rows report. */
+    private record TreeOutput(String rows, LabelStatistics stats, Classification classification) {
     }
 
     /** Applies the mapping file and the extra or special processing to the labels of a tree. */
@@ -580,6 +589,112 @@ public final class cladinator {
         return errors == 0;
     }
 
+    /** The width the demo wraps its text at. */
+    final static private int DEMO_WIDTH = 100;
+
+    /**
+     * -demo: draws each demo tree and prints the row cladinator writes for it, one column per line, and the
+     * conclusion the case is meant to show. Returns whether every case concluded as meant, so that the demo
+     * doubles as a check of an installation.
+     */
+    private static boolean demo() throws IOException {
+        final int n = Demo.CASES.size();
+        System.out.println();
+        System.out.println("Demo: " + n + " synthetic trees with a query placed in them, from the plain case to the edge cases,");
+        System.out.println("with the output cladinator gives for each.");
+        System.out.println();
+        for (final String line : wrap(Demo.REFERENCE, DEMO_WIDTH)) {
+            System.out.println(line);
+        }
+        System.out.println();
+        for (final String line : wrap("Each tree is drawn with its structure and names only, without branch lengths."
+                + " Below it is the row cladinator writes for the tree, one column per line; a run writes it as one"
+                + " tab-separated line of the output table. The last line of a case is the conclusion the case is"
+                + " meant to show, and whether it was drawn.", DEMO_WIDTH)) {
+            System.out.println(line);
+        }
+        int as_expected = 0;
+        int number = 0;
+        for (final Demo.Case c : Demo.CASES) {
+            ++number;
+            System.out.println();
+            System.out.println("--- Case " + number + " of " + n + ": " + c.title() + " ---");
+            for (final String line : wrap("Shows: " + c.shows(), DEMO_WIDTH)) {
+                System.out.println(line);
+            }
+            System.out.println();
+            final Phylogeny phy = ParserBasedPhylogenyFactory.getInstance().create(c.newick(), new NHXParser())[0];
+            for (final String line : phy.toAscii().split("\\R")) {
+                System.out.println("  " + line);
+            }
+            System.out.println();
+            System.out.println("Options: " + demoOptions(c));
+            final Settings st = new Settings(QUERY_PATTERN_DEFAULT, SEP_DEFAULT, null, c.extraProcessing(),
+                    EXTRA_PROCESSING1_SEP_DEFAULT, EXTRA_PROCESSING1_KEEP_EXTRA_DEFAULT, false, null, name -> name, false,
+                    c.cutoff(), NON_HOMOLOGOUS_FACTOR_DEFAULT, c.distanceThreshold());
+            String row;
+            Classification cl = null;
+            try {
+                final TreeOutput out = analyzeTree(phy, number, st, false);
+                row = out.rows();
+                cl = out.classification();
+            } catch (final TreeProblem e) {
+                final String warning = ((e.stats != null) && (e.stats.problem() != null)) ? e.stats.problem() : "";
+                row = errorRow(number, e.query_name, e.getMessage(), e.placements, warning);
+            }
+            final String[] cells = row.split("\n")[0].split("\t", -1);
+            for (int i = 0; i < COLUMNS.length; ++i) {
+                System.out.println(String.format("%-21s:", COLUMNS[i]) + (cells[i].isEmpty() ? "" : " " + cells[i]));
+            }
+            final boolean ok = (cl != null) && (cl.getConclusion() == c.expected())
+                    && Objects.equals(cl.getConclusionClade(), c.expectedClade());
+            if (ok) {
+                ++as_expected;
+            }
+            System.out.println("Expected: " + Demo.describe(c.expected(), c.expectedClade())
+                    + (ok ? " -- as expected" : " -- NOT AS EXPECTED"));
+        }
+        System.out.println();
+        System.out.println("Demo: " + n + " cases, " + as_expected + " concluded as expected"
+                + ((as_expected < n) ? ", " + (n - as_expected) + " NOT as expected" : "") + ".");
+        return as_expected == n;
+    }
+
+    /** The options of a demo case as they would be given on the command line. */
+    private static String demoOptions(final Demo.Case c) {
+        final List<String> l = new ArrayList<>();
+        if (c.extraProcessing()) {
+            l.add("-" + EXTRA_PROCESSING_OPTION1);
+        }
+        if (c.cutoff() != CUTOFF_DEFAULT) {
+            l.add("-" + CUTOFF_OPTION + "=" + c.cutoff());
+        }
+        if (c.distanceThreshold() != null) {
+            l.add("-" + DISTANCE_THRESHOLD_OPTION + "=" + c.distanceThreshold());
+        }
+        return l.isEmpty() ? "none (the defaults)" : String.join(" ", l);
+    }
+
+    /** Breaks a text into lines of at most width characters, at spaces. */
+    private static List<String> wrap(final String text, final int width) {
+        final List<String> lines = new ArrayList<>();
+        final StringBuilder line = new StringBuilder();
+        for (final String word : text.split(" ")) {
+            if ((line.length() > 0) && (line.length() + 1 + word.length() > width)) {
+                lines.add(line.toString());
+                line.setLength(0);
+            }
+            if (line.length() > 0) {
+                line.append(' ');
+            }
+            line.append(word);
+        }
+        if (line.length() > 0) {
+            lines.add(line.toString());
+        }
+        return lines;
+    }
+
     private static void emit(final List<BufferedWriter> writers, final String text) throws IOException {
         for (final BufferedWriter w : writers) {
             w.write(text);
@@ -587,8 +702,9 @@ public final class cladinator {
         }
     }
 
-    /** Analyzes one tree and returns its row(s) of the table. */
-    private static TreeOutput analyzeTree(final Phylogeny phy, final int counter, final Settings st) throws TreeProblem {
+    /** Analyzes one tree and returns its row(s) of the table; verbose prints what the label processing did. */
+    private static TreeOutput analyzeTree(final Phylogeny phy, final int counter, final Settings st, final boolean verbose)
+            throws TreeProblem {
         final Pattern pattern = st.pattern();
         final List<PhylogenyNode> query_nodes = phy.getNodes(pattern); // null for an empty tree
         if ((query_nodes == null) || query_nodes.isEmpty()) {
@@ -597,13 +713,14 @@ public final class cladinator {
         final String query_name = queryNamePrefix(query_nodes.get(0), pattern);
         LabelStatistics stats = null;
         try {
-            processLabels(phy, st, true);
+            processLabels(phy, st, verbose);
             stats = AnalysisMulti.prepare(phy, pattern, st.separator());
             if ((st.nh_factor() > 0) && AnalysisMulti.likelyProblematicQuery(phy, pattern, st.nh_factor())) {
                 throw new TreeProblem(NON_HOMOLOGOUS_QUERY_MESSAGE, query_name, query_nodes.size(), false, stats);
             }
             final ResultMulti res = AnalysisMulti.execute(phy, pattern, st.separator(), stats);
-            return new TreeOutput(resultRows(res, counter, st), stats);
+            final Classification c = Classification.of(res, st.cutoff(), st.distance_threshold());
+            return new TreeOutput(resultRows(res, c, counter, st), stats, c);
         } catch (final UserException e) {
             throw new TreeProblem("Input error: " + e.getMessage(), query_name, query_nodes.size(), true, stats);
         }
@@ -625,9 +742,8 @@ public final class cladinator {
         return Arrays.asList(COLUMNS).indexOf(name);
     }
 
-    /** The row(s) for a result: the classification of the query at the cutoff, one row per query name. */
-    private static String resultRows(final ResultMulti res, final int counter, final Settings st) {
-        final Classification c = Classification.of(res, st.cutoff(), st.distance_threshold());
+    /** The row(s) for a result and its classification, one row per query name. */
+    private static String resultRows(final ResultMulti res, final Classification c, final int counter, final Settings st) {
         final StringBuilder rows = new StringBuilder();
         for (final String query : queryNames(res.getQueryNamePrefix(), st.split_query())) {
             rows.append(row(counter, query, c, res, st.label()));
@@ -758,6 +874,8 @@ public final class cladinator {
         System.out.println("                      that leaf's clade, one farther from every reference leaf is a novel lineage (default: by topology)");
         System.out.println("  -" + DRY_RUN_OPTION + "           : the run without the table: shows what is read from each tree after the label processing (leaves,");
         System.out.println("                      top-level clades, label levels, the first labels, the query) and what the run would report for it");
+        System.out.println("  -" + DEMO_OPTION + "              : the demo, with no other options or files: draws " + Demo.CASES.size() + " synthetic trees with a query placed in them,");
+        System.out.println("                      from the plain case to the edge cases, with the output for each; also checks the installation");
         System.out.println("  -" + QUERY_PATTERN_OPTION + "=<pattern>       : expert option: the regular expression pattern for the query (default: \"" + QUERY_PATTERN_DEFAULT + "\" for pplacer output)");
         System.out.println();
         System.out.println("Examples:");

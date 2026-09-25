@@ -41,3 +41,4 @@ t06_sep_us_dry_run	t06_sep_us.nwk	-dry-run	255
 t26_forgot_x_dry_run_x	t26_forgot_x.nwk	-dry-run -x
 t27_most_alone_dry_run	t27_most_alone.nwk	-dry-run
 t07_dry_run_no_query	t07_nomatch_then_ok.nwk	-dry-run	255
+demo		-demo
