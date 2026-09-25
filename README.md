@@ -339,7 +339,7 @@ java -cp dist/cladinator.jar org.cladinator.cladinator_tree_prepare <in-tree> <o
 
 ## Changes
 
-**Unreleased**
+**3.5.0** (2026-09-25)
 
 - New option `-demo`: twelve synthetic trees with a query placed in them,
   from the plain case to the edge cases, drawn on the terminal with the

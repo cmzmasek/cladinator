@@ -54,8 +54,8 @@ import org.forester.util.UserException;
 public final class cladinator {
 
     final static private String PRG_NAME = "cladinator";
-    final static private String PRG_VERSION = "3.4.0";
-    final static private String PRG_DATE = "2026-09-24";
+    final static private String PRG_VERSION = "3.5.0";
+    final static private String PRG_DATE = "2026-09-25";
     final static private String PRG_DESC = "clades within clades of annotated labels -- analysis of pplacer-type outputs";
     final static private String E_MAIL = "czmasek at jcvi dot org";
     final static private String WWW = "https://github.com/cmzmasek/cladinator";
